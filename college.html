@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Colleges | CampusFind AI</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f7fb;
+            color: #172033;
+        }
+
+        /* NAVBAR */
+        nav {
+            height: 70px;
+            background: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 7%;
+            border-bottom: 1px solid #e5e7eb;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 21px;
+            font-weight: bold;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: #172033;
+            color: white;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        nav a {
+            text-decoration: none;
+            color: #172033;
+            margin-left: 25px;
+            font-weight: 600;
+        }
+
+        nav a:hover {
+            color: #4f46e5;
+        }
+
+        /* HERO */
+        .hero {
+            background: linear-gradient(135deg, #172033, #303b63);
+            color: white;
+            padding: 70px 7%;
+            text-align: center;
+        }
+
+        .hero h1 {
+            font-size: 46px;
+            margin-bottom: 15px;
+        }
+
+        .hero p {
+            font-size: 18px;
+            color: #d8def0;
+            max-width: 650px;
+            margin: auto;
+            line-height: 1.6;
+        }
+
+        /* SEARCH */
+        .search-area {
+            max-width: 1000px;
+            margin: -30px auto 50px;
+            padding: 25px;
+            background: white;
+            border-radius: 18px;
+            box-shadow: 0 10px 35px rgba(0,0,0,0.10);
+            position: relative;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 16px;
+            border: 1px solid #d9dce5;
+            border-radius: 10px;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .search-box input:focus {
+            border-color: #4f46e5;
+        }
+
+        .search-btn {
+            border: none;
+            background: #4f46e5;
+            color: white;
+            padding: 0 25px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .search-btn:hover {
+            background: #3730a3;
+        }
+
+        .filters {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .filters select {
+            padding: 14px;
+            border: 1px solid #d9dce5;
+            border-radius: 10px;
+            font-size: 15px;
+            background: white;
+        }
+
+        /* COLLEGE SECTION */
+        .container {
+            width: 86%;
+            max-width: 1200px;
+            margin: auto;
+        }
+
+        .section-heading {
+            margin-bottom: 25px;
+        }
+
+        .section-heading h2 {
+            font-size: 30px;
+            margin-bottom: 7px;
+        }
+
+        .section-heading p {
+            color: #667085;
+        }
+
+        .college-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 25px;
+            padding-bottom: 70px;
+        }
+
+        /* COLLEGE CARD */
+        .college-card {
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid #e5e7eb;
+            transition: 0.25s;
+        }
+
+        .college-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.10);
+        }
+
+        .college-image {
+            height: 150px;
+            background: linear-gradient(135deg, #4f46e5, #818cf8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 42px;
+            font-weight: bold;
+        }
+
+        .college-content {
+            padding: 22px;
+        }
+
+        .college-content h3 {
+            font-size: 20px;
+            margin-bottom: 8px;
+        }
+
+        .location {
+            color: #667085;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 7px;
+            margin-bottom: 18px;
+        }
+
+        .tag {
+            background: #eef2ff;
+            color: #4338ca;
+            padding: 6px 9px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .details-btn {
+            display: block;
+            text-align: center;
+            text-decoration: none;
+            background: #172033;
+            color: white;
+            padding: 12px;
+            border-radius: 9px;
+            font-weight: bold;
+        }
+
+        .details-btn:hover {
+            background: #4f46e5;
+        }
+
+        /* NO RESULTS */
+        .no-results {
+            display: none;
+            text-align: center;
+            padding: 50px;
+            color: #667085;
+            grid-column: 1 / -1;
+        }
+
+        /* FOOTER */
+        footer {
+            background: #172033;
+            color: white;
+            padding: 35px 7%;
+            text-align: center;
+        }
+
+        footer p {
+            color: #b8bfd1;
+            margin-top: 8px;
+        }
+
+        /* MOBILE */
+        @media (max-width: 800px) {
+
+            nav {
+                padding: 0 5%;
+            }
+
+            nav a {
+                margin-left: 10px;
+                font-size: 14px;
+            }
+
+            .hero {
+                padding: 55px 5%;
+            }
+
+            .hero h1 {
+                font-size: 35px;
+            }
+
+            .search-area {
+                width: 90%;
+            }
+
+            .college-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 550px) {
+
+            .search-box {
+                flex-direction: column;
+            }
+
+            .search-btn {
+                padding: 14px;
+            }
+
+            .filters {
+                grid-template-columns: 1fr;
+            }
+
+            .hero h1 {
+                font-size: 30px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- NAVIGATION -->
+    <nav>
+
+        <div class="logo">
+            <div class="logo-icon">CF</div>
+            <span>CampusFind AI</span>
+        </div>
+
+        <div>
+            <a href="index.html">Home</a>
+            <a href="college.html">Colleges</a>
+        </div>
+
+    </nav>
+
+
+    <!-- HERO -->
+    <section class="hero">
+
+        <h1>Find Your College</h1>
+
+        <p>
+            Discover colleges, courses and opportunities that match
+            your education goals.
+        </p>
+
+    </section>
+
+
+    <!-- SEARCH AREA -->
+    <section class="search-area">
+
+        <div class="search-box">
+
+            <input
+                type="text"
+                id="searchInput"
+                placeholder="Search college, course or location..."
+            >
+
+            <button class="search-btn" onclick="filterColleges()">
+                Search
+            </button>
+
+        </div>
+
+
+        <div class="filters">
+
+            <select id="cityFilter" onchange="filterColleges()">
+
+                <option value="all">All Cities</option>
+
+                <option value="Mumbai">Mumbai</option>
+
+                <option value="Pune">Pune</option>
+
+                <option value="Nashik">Nashik</option>
+
+            </select>
+
+
+            <select id="courseFilter" onchange="filterColleges()">
+
+                <option value="all">All Courses</option>
+
+                <option value="Engineering">Engineering</option>
+
+                <option value="Science">Science</option>
+
+                <option value="Commerce">Commerce</option>
+
+                <option value="Management">Management</option>
+
+            </select>
+
+        </div>
+
+    </section>
+
+
+    <!-- COLLEGES -->
+    <main class="container">
+
+        <div class="section-heading">
+
+            <h2>Popular Colleges</h2>
+
+            <p>
+                Explore colleges and find the right option for you.
+            </p>
+
+        </div>
+
+
+        <div class="college-grid" id="collegeGrid">
+
+
+            <!-- COLLEGE 1 -->
+
+            <div
+                class="college-card"
+                data-city="Mumbai"
+                data-course="Science"
+            >
+
+                <div class="college-image">
+                    MU
+                </div>
+
+                <div class="college-content">
+
+                    <h3>University of Mumbai</h3>
+
+                    <div class="location">
+                        📍 Mumbai, Maharashtra
+                    </div>
+
+                    <div class="tags">
+                        <span class="tag">Science</span>
+                        <span class="tag">Commerce</span>
+                        <span class="tag">Management</span>
+                    </div>
+
+                    <a href="#" class="details-btn">
+                        View Details
+                    </a>
+
+                </div>
+
+            </div>
+
+
+            <!-- COLLEGE 2 -->
+
+            <div
+                class="college-card"
+                data-city="Mumbai"
+                data-course="Engineering"
+            >
+
+                <div class="college-image">
+                    IIT
+                </div>
+
+                <div class="college-content">
+
+                    <h3>IIT Bombay</h3>
+
+                    <div class="location">
+                        📍 Mumbai, Maharashtra
+                    </div>
+
+                    <div class="tags">
+                        <span class="tag">Engineering</span>
+                        <span class="tag">Science</span>
+                    </div>
+
+                    <a href="#" class="details-btn">
+                        View Details
+                    </a>
+
+                </div>
+
+            </div>
+
+
+            <!-- COLLEGE 3 -->
+
+            <div
+                class="college-card"
+                data-city="Pune"
+                data-course="Engineering"
+            >
+
+                <div class="college-image">
+                    COEP
+                </div>
+
+                <div class="college-content">
+
+                    <h3>COEP Technological University</h3>
+
+                    <div class="location">
+                        📍 Pune, Maharashtra
+                    </div>
+
+                    <div class="tags">
+                        <span class="tag">Engineering</span>
+                        <span class="tag">Technology</span>
+                    </div>
+
+                    <a href="#" class="details-btn">
+                        View Details
+                    </a>
+
+                </div>
+
+            </div>
+
+
+            <!-- COLLEGE 4 -->
+
+            <div
+                class="college-card"
+                data-city="Mumbai"
+                data-course="Commerce"
+            >
+
+                <div class="college-image">
+                    KC
+                </div>
+
+                <div class="college-content">
+
+                    <h3>K.C. College</h3>
+
+                    <div class="location">
+                        📍 Mumbai, Maharashtra
+                    </div>
+
+                    <div class="tags">
+                        <span class="tag">Commerce</span>
+                        <span class="tag">Science</span>
+                    </div>
+
+                    <a href="#" class="details-btn">
+                        View Details
+                    </a>
+
+                </div>
+
+            </div>
+
+
+            <!-- COLLEGE 5 -->
+
+            <div
+                class="college-card"
+                data-city="Pune"
+                data-course="Management"
+            >
+
+                <div class="college-image">
+                    SIBM
+                </div>
+
+                <div class="college-content">
+
+                    <h3>Symbiosis Institute</h3>
+
+                    <div class="location">
+                        📍 Pune, Maharashtra
+                    </div>
+
+                    <div class="tags">
+                        <span class="tag">Management</span>
+                        <span class="tag">Business</span>
+                    </div>
+
+                    <a href="#" class="details-btn">
+                        View Details
+                    </a>
+
+                </div>
+
+            </div>
+
+
+            <!-- COLLEGE 6 -->
+
+            <div
+                class="college-card"
+                data-city="Nashik"
+                data-course="Science"
+            >
+
+                <div class="college-image">
+                    KTHM
+                </div>
+
+                <div class="college-content">
+
+                    <h3>KTHM College</h3>
+
+                    <div class="location">
+                        📍 Nashik, Maharashtra
+                    </div>
+
+                    <div class="tags">
+                        <span class="tag">Science</span>
+                        <span class="tag">Commerce</span>
+                    </div>
+
+                    <a href="#" class="details-btn">
+                        View Details
+                    </a>
+
+                </div>
+
+            </div>
+
+
+            <!-- NO RESULTS -->
+
+            <div class="no-results" id="noResults">
+
+                <h3>No colleges found</h3>
+
+                <p>
+                    Try changing your search or filters.
+                </p>
+
+            </div>
+
+        </div>
+
+    </main>
+
+
+    <!-- FOOTER -->
+
+    <footer>
+
+        <h3>CampusFind AI</h3>
+
+        <p>
+            Find the right college. Find your future.
+        </p>
+
+    </footer>
+
+
+    <!-- JAVASCRIPT -->
+
+    <script>
+
+        function filterColleges() {
+
+            const search =
+                document.getElementById("searchInput")
+                .value
+                .toLowerCase();
+
+            const city =
+                document.getElementById("cityFilter")
+                .value;
+
+            const course =
+                document.getElementById("courseFilter")
+                .value;
+
+            const cards =
+                document.querySelectorAll(".college-card");
+
+            let visibleCards = 0;
+
+
+            cards.forEach(function(card) {
+
+                const text =
+                    card.innerText.toLowerCase();
+
+                const cardCity =
+                    card.getAttribute("data-city");
+
+                const cardCourse =
+                    card.getAttribute("data-course");
+
+
+                const matchesSearch =
+                    text.includes(search);
+
+                const matchesCity =
+                    city === "all" ||
+                    cardCity === city;
+
+                const matchesCourse =
+                    course === "all" ||
+                    cardCourse === course;
+
+
+                if (
+                    matchesSearch &&
+                    matchesCity &&
+                    matchesCourse
+                ) {
+
+                    card.style.display = "block";
+
+                    visibleCards++;
+
+                } else {
+
+                    card.style.display = "none";
+
+                }
+
+            });
+
+
+            const noResults =
+                document.getElementById("noResults");
+
+
+            if (visibleCards === 0) {
+
+                noResults.style.display = "block";
+
+            } else {
+
+                noResults.style.display = "none";
+
+            }
+
+        }
+
+    </script>
+
+</body>
+</html>

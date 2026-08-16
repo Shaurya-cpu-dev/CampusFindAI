@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Find a Lost Item - CampusFind AI</title>
+    <link rel="stylesheet" href="public/css/style.css">
+</head>
+<body>
+    <header>
+        <h2>CampusFind AI</h2>
+        <a href="index.html">← Back Home</a>
+    </header>
+
+    <main class="lost-page">
+        <div class="page-head">
+            <div class="eyebrow">AI MATCHING • SECURE • FAST</div>
+            <h1>Find your lost item</h1>
+            <p>Tell us what you lost — our engine scans all found reports from the shared backend and ranks them by match percentage.</p>
+        </div>
+
+        <form class="lost-form" id="lostForm">
+            <div class="form-grid">
+                <div class="field-group">
+                    <label for="itemName">What did you lose? <span>*</span></label>
+                    <input type="text" id="itemName" placeholder="Example: Black wallet with gold zip" required>
+                </div>
+
+                <div class="field-row">
+                    <div class="field-group">
+                        <label for="lostLocation">Where did you lose it? <span>*</span></label>
+                        <input type="text" id="lostLocation" placeholder="College library, 2nd floor" required>
+                    </div>
+                    <div class="field-group">
+                        <label for="lostDate">When did you lose it? <span>*</span></label>
+                        <input type="date" id="lostDate" required>
+                    </div>
+                </div>
+
+                <div class="field-group">
+                    <label>What time did you lose it? <span>*</span></label>
+                    <div class="time-select-row">
+                        <select id="lostHour" required>
+                            <option value="">Hour</option>
+                            <option value="01">01</option><option value="02">02</option><option value="03">03</option>
+                            <option value="04">04</option><option value="05">05</option><option value="06">06</option>
+                            <option value="07">07</option><option value="08">08</option><option value="09">09</option>
+                            <option value="10">10</option><option value="11">11</option><option value="12">12</option>
+                        </select>
+                        <select id="lostMinute" required>
+                            <option value="">Minute</option>
+                            <option value="00">00</option><option value="05">05</option><option value="10">10</option>
+                            <option value="15">15</option><option value="20">20</option><option value="25">25</option>
+                            <option value="30">30</option><option value="35">35</option><option value="40">40</option>
+                            <option value="45">45</option><option value="50">50</option><option value="55">55</option>
+                        </select>
+                        <select id="lostAmPm" required>
+                            <option value="">AM / PM</option>
+                            <option value="AM">AM</option>
+                            <option value="PM">PM</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="field-group">
+                    <label for="itemDescription">Describe the item</label>
+                    <textarea id="itemDescription" placeholder="Colour, brand, unique features, scratches, contents... More detail = higher match accuracy."></textarea>
+                    <div class="hint">We match on meaningful words only — colors, brands, and categories get extra weight.</div>
+                </div>
+
+                <button type="submit" id="searchBtn">Search for my item →</button>
+                <p class="hint" style="text-align:center" id="searchStatus">Fetching from shared backend GET /api/found</p>
+            </div>
+        </form>
+    </main>
+
+    <script>
+        document.getElementById("lostForm").addEventListener("submit", async function(event) {
+            event.preventDefault();
+
+            const itemName = document.getElementById("itemName").value.trim();
+            const lostLocation = document.getElementById("lostLocation").value.trim();
+            const itemDescription = document.getElementById("itemDescription").value.trim();
+            const lostDate = document.getElementById("lostDate").value;
+            const lostHour = document.getElementById("lostHour").value;
+            const lostMinute = document.getElementById("lostMinute").value;
+            const lostAmPm = document.getElementById("lostAmPm").value;
+            const searchBtn = document.getElementById("searchBtn");
+            const searchStatus = document.getElementById("searchStatus");
+
+            let convertedHour = lostHour;
+            if (lostHour) {
+                let numericHour = parseInt(lostHour, 10);
+                if (lostAmPm === "AM" && numericHour === 12) numericHour = 0;
+                if (lostAmPm === "PM" && numericHour !== 12) numericHour += 12;
+                convertedHour = String(numericHour).padStart(2, "0");
+            }
+
+            const lostDateTime = lostDate && convertedHour && lostMinute && lostAmPm ? `${lostDate}T${convertedHour}:${lostMinute}:00` : "";
+
+            // Loading state
+            searchBtn.disabled = true;
+            searchBtn.textContent = "Searching backend...";
+            searchStatus.textContent = "Fetching reports from GET /api/found...";
+
+            let foundItems = [];
+            try {
+                const res = await fetch("/api/found");
+                if (!res.ok) throw new Error("Server returned " + res.status);
+                const json = await res.json();
+                if (!json.success) throw new Error(json.message || "Failed to load");
+                foundItems = json.data || [];
+                searchStatus.textContent = `${foundItems.length} reports loaded from backend. Running matching algorithm...`;
+            } catch (err) {
+                console.error("Fetch error:", err);
+                searchStatus.textContent = "Error: " + err.message;
+                alert("Could not load found reports from backend.\n\n" + err.message + "\n\nMake sure server is running at http://localhost:3000 and you opened via http://localhost:3000/lost.html");
+                searchBtn.disabled = false;
+                searchBtn.textContent = "Search for my item →";
+                return;
+            }
+
+            // MATCHING HELPERS - PRESERVED EXACTLY FROM YOUR ORIGINAL
+            function cleanText(text) {
+                return text.toLowerCase().replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
+            }
+            function getMeaningfulWords(text) {
+                const commonWords = new Set([
+                    "the","be","to","of","and","a","in","that","have","i","it","for","not","on","with","he","as","you","do","at",
+                    "this","but","his","by","from","they","we","say","her","she","or","an","will","my","one","all","would","there","their",
+                    "what","so","up","out","if","about","who","get","which","go","me","when","make","can","like","time","no","just","him","know",
+                    "take","people","into","year","your","good","some","could","them","see","other","than","then","now","look","only","come","its","over","think",
+                    "also","back","after","use","two","how","our","work","first","well","way","even","new","want","because","any","these","give","day","most","us"
+                ]);
+                return text.toLowerCase().split(/\s+/).filter(function(word){ return word.length > 2 && !commonWords.has(word); });
+            }
+            function detectCategory(text) {
+                const categories = {
+                    electronics: ["phone","laptop","charger","earphone","headphone","tablet","usb","cable","battery","keyboard"],
+                    books: ["book","notebook","textbook","novel","magazine","journal","paper","folder"],
+                    clothing: ["jacket","shirt","pants","jeans","hoodie","sweater","coat","scarf","gloves","shoes"],
+                    accessories: ["watch","bag","backpack","wallet","purse","belt","necklace","ring","glasses"],
+                    documents: ["id","card","passport","license","certificate","envelope","letter"],
+                    keys: ["key","keychain","keyring"],
+                    food: ["bottle","lunchbox","container","cup","mug"]
+                };
+                const words = text.toLowerCase().split(/\s+/);
+                for (const [category, keywords] of Object.entries(categories)) {
+                    for (const keyword of keywords) {
+                        if (words.some(function(word){ return word.includes(keyword); })) return category;
+                    }
+                }
+                return "other";
+            }
+            function parseStoredDate(value) {
+                if (!value) return null;
+                if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+                    const parts = value.split("-");
+                    const year = Number(parts[0]); const month = Number(parts[1]) - 1; const day = Number(parts[2]);
+                    return new Date(year, month, day);
+                }
+                const parsed = new Date(value);
+                return isNaN(parsed.getTime()) ? null : parsed;
+            }
+            function calculateMatchScore(lostText, foundItem) {
+                const lostClean = cleanText(lostText);
+                const foundClean = cleanText((foundItem.item || "") + " " + (foundItem.description || "") + " " + (foundItem.location || ""));
+                const lostWords = getMeaningfulWords(lostClean);
+                const foundWords = getMeaningfulWords(foundClean);
+
+                const lostItemName = document.getElementById("itemName").value;
+                const lostNameWords = getMeaningfulWords(cleanText(lostItemName));
+                const foundNameWords = getMeaningfulWords(cleanText(foundItem.item || ""));
+                const lostNameMatches = lostNameWords.filter(function(word){ return foundNameWords.includes(word); });
+
+                const colors = ["black","white","red","blue","green","yellow","orange","pink","purple","brown","grey","gray"];
+                const lostColor = lostNameWords.find(function(word){ return colors.includes(word); });
+                const foundColor = foundNameWords.find(function(word){ return colors.includes(word); });
+
+                if (lostColor && foundColor && lostColor !== foundColor) return 0;
+                const commonNameMatches = lostNameWords.filter(function(word){ return foundNameWords.includes(word); });
+                if (commonNameMatches.length === 0) return 0;
+
+                const nameScore = lostNameWords.length > 0 ? (lostNameMatches.length / lostNameWords.length) * 40 : 0;
+
+                const foundDescriptionWords = getMeaningfulWords(cleanText(foundItem.description || ""));
+                const descriptionMatches = lostWords.filter(function(word){ return foundDescriptionWords.includes(word); });
+                const descriptionScore = foundDescriptionWords.length > 0 ? (descriptionMatches.length / Math.min(foundDescriptionWords.length, 20)) * 30 : 0;
+
+                const foundLocationWords = getMeaningfulWords(cleanText(foundItem.location || ""));
+                const locationMatches = lostWords.filter(function(word){ return foundLocationWords.includes(word); });
+                const locationScore = foundLocationWords.length > 0 ? (locationMatches.length / foundLocationWords.length) * 20 : 0;
+
+                const lostCategory = detectCategory(lostText);
+                const foundCategory = detectCategory((foundItem.item || "") + " " + (foundItem.description || ""));
+                const categoryBonus = (lostCategory === foundCategory && lostCategory !== "other") ? 15 : 0;
+
+                let dateAdjustment = 0;
+                const lostDateObject = lostDateTime ? new Date(lostDateTime) : null;
+                const foundDateValue = foundItem.dateTime || foundItem.date || "";
+                const foundDateObject = parseStoredDate(foundDateValue);
+                if (lostDateObject && foundDateObject) {
+                    const difference = Math.abs(lostDateObject.getTime() - foundDateObject.getTime());
+                    const daysDifference = difference / (1000 * 60 * 60 * 24);
+                    if (daysDifference <= 1) dateAdjustment = 10;
+                    else if (daysDifference <= 3) dateAdjustment = 6;
+                    else if (daysDifference <= 7) dateAdjustment = 3;
+                    else if (daysDifference <= 30) dateAdjustment = 0;
+                    else dateAdjustment = -5;
+                }
+
+                const totalMatches = lostWords.filter(function(word){ return foundWords.includes(word); }).length;
+                const overlapBonus = Math.min(totalMatches * 2, 10);
+
+                let totalScore = nameScore + descriptionScore + locationScore + categoryBonus + dateAdjustment + overlapBonus;
+                if (lostNameMatches.length === 0) totalScore = Math.min(totalScore, 15);
+                totalScore = Math.min(Math.max(totalScore, 0), 100);
+                return Math.round(totalScore);
+            }
+
+            const matches = foundItems.map(function(foundItem){
+                const lostSearchText = (itemName + " " + lostLocation + " " + itemDescription);
+                const score = calculateMatchScore(lostSearchText, foundItem);
+                return { ...foundItem, score: score };
+            }).filter(function(item){ return item.score >= 20; }).sort(function(a, b){ return b.score - a.score; });
+
+            // REMOVE PREVIOUS RESULTS
+            const oldResults = document.getElementById("matchResults");
+            if (oldResults) oldResults.remove();
+
+            // CREATE RESULTS - XSS-SAFE
+            const resultsContainer = document.createElement("div");
+            resultsContainer.id = "matchResults";
+
+            const wrapper = document.createElement("div");
+            wrapper.className = "match-results";
+
+            const heading = document.createElement("div");
+            heading.className = "match-heading";
+            const headingLeft = document.createElement("div");
+            const label = document.createElement("p");
+            label.className = "section-label";
+            label.textContent = "CAMPUSFIND AI";
+            const h2 = document.createElement("h2");
+            h2.textContent = "Potential matches";
+            const p = document.createElement("p");
+            p.textContent = "Results for ";
+            const strong = document.createElement("strong");
+            strong.textContent = itemName;
+            p.appendChild(strong);
+
+            headingLeft.appendChild(label);
+            headingLeft.appendChild(h2);
+            headingLeft.appendChild(p);
+
+            const count = document.createElement("div");
+            count.className = "count";
+            count.textContent = matches.length + " found • backend: GET /api/found";
+
+            heading.appendChild(headingLeft);
+            heading.appendChild(count);
+            wrapper.appendChild(heading);
+
+            if (matches.length === 0) {
+                const empty = document.createElement("div");
+                empty.className = "empty-state";
+                const icon = document.createElement("div");
+                icon.className = "icon";
+                icon.textContent = "🔍";
+                const eh3 = document.createElement("h3");
+                eh3.textContent = "No matching reports yet";
+                const ep = document.createElement("p");
+                if (foundItems.length === 0) {
+                    ep.textContent = "No found reports in backend yet. Go to Report Found Item to add one, then search again.";
+                } else {
+                    ep.textContent = "No reports match '" + itemName + "'. " + foundItems.length + " reports exist in backend, but none scored >=20%. Try different keywords.";
+                }
+                empty.appendChild(icon);
+                empty.appendChild(eh3);
+                empty.appendChild(ep);
+                wrapper.appendChild(empty);
+            } else {
+                matches.forEach(function(foundItem){
+                    const card = document.createElement("div");
+                    card.className = "result-card";
+
+                    const iconBox = document.createElement("div");
+                    iconBox.className = "result-icon";
+                    if (foundItem.photo) {
+                        const img = document.createElement("img");
+                        img.src = foundItem.photo;
+                        img.alt = "Found item photo";
+                        iconBox.appendChild(img);
+                    } else {
+                        iconBox.textContent = "📦";
+                    }
+
+                    const info = document.createElement("div");
+                    info.className = "result-info";
+
+                    const title = document.createElement("h3");
+                    title.textContent = foundItem.item || "Untitled item";
+
+                    const meta = document.createElement("div");
+                    meta.className = "meta";
+
+                    const loc = document.createElement("span");
+                    loc.textContent = "📍 " + (foundItem.location || "Unknown location");
+
+                    const dateSpan = document.createElement("span");
+                    dateSpan.textContent = "🗓 " + (foundItem.date || foundItem.dateTime || "No date");
+
+                    meta.appendChild(loc);
+                    meta.appendChild(dateSpan);
+
+                    const desc = document.createElement("small");
+                    desc.textContent = foundItem.description || "";
+
+                    info.appendChild(title);
+                    info.appendChild(meta);
+                    if (foundItem.description) info.appendChild(desc);
+
+                    const scoreBox = document.createElement("div");
+                    scoreBox.className = "match-score-result";
+                    if (foundItem.score < 50) scoreBox.classList.add("low");
+                    if (foundItem.score >= 90) scoreBox.classList.add("high");
+                    const strongScore = document.createElement("strong");
+                    strongScore.textContent = foundItem.score + "%";
+                    const span = document.createElement("span");
+                    span.textContent = "Match";
+                    scoreBox.appendChild(strongScore);
+                    scoreBox.appendChild(span);
+
+                    card.appendChild(iconBox);
+                    card.appendChild(info);
+                    card.appendChild(scoreBox);
+                    wrapper.appendChild(card);
+                });
+            }
+
+            const note = document.createElement("p");
+            note.className = "demo-note";
+            note.textContent = "Now using shared backend GET /api/found — same matching algorithm you tested for 99% match. Data survives restarts.";
+            wrapper.appendChild(note);
+
+            resultsContainer.appendChild(wrapper);
+            document.querySelector("main").appendChild(resultsContainer);
+            resultsContainer.scrollIntoView({ behavior: "smooth" });
+
+            searchBtn.disabled = false;
+            searchBtn.textContent = "Search for my item →";
+        });
+    </script>
+</body>
+</html>

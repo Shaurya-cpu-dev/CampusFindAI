@@ -1,50 +1,136 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Found — CampusFind</title><link rel="stylesheet" href="style.css">
-<style>body{background:#f8fafc}.topbar{position:sticky;top:0;background:white;border-bottom:1px solid #e2e8f0;padding:0 24px;height:60px;display:flex;align-items:center;justify-content:space-between}.form-wrap{max-width:720px;margin:24px auto;padding:0 16px 80px}.card{background:white;border:1px solid #e2e8f0;border-radius:20px;padding:20px}.field{margin-bottom:14px}.field label{font-size:12px;font-weight:700;display:block;margin-bottom:6px}.field input,.field textarea{width:100%;padding:12px;border:1px solid #e2e8f0;border-radius:12px}.btn-primary{width:100%;background:#0f172a;color:white;padding:14px;border-radius:14px;font-weight:800;border:none;cursor:pointer}</style>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Lost something? Report in 30 seconds — CampusFind</title><link rel="stylesheet" href="style.css">
+<style>
+body{background:#f8fafc}
+.topbar{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.9);backdrop-filter:blur(12px);border-bottom:1px solid #e2e8f0;padding:0 24px;height:60px;display:flex;align-items:center;justify-content:space-between}
+.form-wrap{max-width:720px;margin:24px auto;padding:0 16px 80px}
+.card{background:white;border:1px solid #e2e8f0;border-radius:20px;padding:20px;box-shadow:0 8px 24px rgba(15,23,42,.06)}
+.eyebrow{font-size:11px;font-weight:800;letter-spacing:.12em;color:#64748b;margin-bottom:8px}
+h1{font-size:28px;font-weight:900;letter-spacing:-.03em;line-height:1.1;margin-bottom:8px}
+.sub{font-size:14px;color:#64748b;line-height:1.6;margin-bottom:18px}
+.field{margin-bottom:14px}
+.field label{font-size:12px;font-weight:700;display:block;margin-bottom:6px;color:#0f172a}
+.field input,.field textarea,.field select{width:100%;padding:12px 14px;border:1px solid #e2e8f0;border-radius:12px;font-size:14px;background:white;outline:none}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:#0f172a;box-shadow:0 0 0 3px rgba(15,23,42,.08)}
+.field small{font-size:11px;color:#94a3b8;margin-top:6px;display:block;line-height:1.5}
+.row{grid-template-columns:1fr 1fr;display:grid;gap:12px}
+@media(max-width:600px){.row{grid-template-columns:1fr}}
+.time-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.upload{border:2px dashed #e2e8f0;border-radius:14px;padding:12px;background:#f8fafc}
+.btn-primary{width:100%;background:#0f172a;color:white;padding:14px;border-radius:14px;font-weight:800;border:none;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.btn-secondary{width:100%;background:white;border:1px solid #e2e8f0;padding:12px;border-radius:12px;font-weight:700;cursor:pointer;margin-top:10px}
+.gate{padding:12px;border-radius:12px;margin-bottom:16px;font-size:13px}
+.gate.ok{background:#f0fdf4;border:1px solid #bbf7d0;color:#14532d}
+.gate.warn{background:#fff7ed;border:1px solid #fed7aa;color:#7c2d12}
+.match-card{border:1px solid #bbf7d0;background:#f0fdf4;border-radius:16px;padding:16px;margin-top:12px}
+.match-card h3{font-size:15px;font-weight:800;margin-bottom:8px}
+.pill{font-size:11px;font-weight:700;padding:4px 8px;border-radius:999px;background:#0f172a;color:white}
+.strength{font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;display:inline-block}
+.strength.high{background:#16a34a;color:white}
+.strength.medium{background:#f59e0b;color:white}
+.strength.low{background:#e2e8f0;color:#475569}
+</style>
 </head>
 <body>
-<div class="topbar"><a href="/" style="font-weight:900;text-decoration:none;color:#0f172a">← CampusFind</a><span id="userPill" style="font-size:12px"></span></div>
-<div class="form-wrap"><div class="card"><h1>Found something?</h1><p style="font-size:14px;color:#64748b;margin-bottom:16px">Thanks for helping — report in 30 seconds.</p>
-<form id="foundForm">
-<div class="field"><label>What did you find? *</label><input id="foundItem" required></div>
-<div class="field"><label>Where? *</label><input id="foundLocation" required></div>
-<div class="field"><label>When? *</label><input id="foundDate" type="date" required></div>
-<div class="field"><label>Description *</label><textarea id="foundDescription" rows="3" required></textarea></div>
-<div class="field"><label>Photo</label><input type="file" id="photoGallery" accept="image/*"><div id="preview"></div></div>
-<button type="submit" id="submitBtn" class="btn-primary">Report found item</button>
-</form></div><div id="results"></div></div>
+<div class="topbar"><a href="/" style="font-weight:900;text-decoration:none;color:#0f172a">← CampusFind</a><span id="userPill" style="font-size:12px;font-weight:700"></span></div>
+<div class="form-wrap">
+<div class="card">
+<p class="eyebrow">REPORT LOST • PRIVATE • 30 SECONDS</p>
+<h1>Lost something on campus?</h1>
+<p class="sub">Tell us what, where, and when. We'll keep checking new found reports and notify you privately if a possible match appears. Your report is private — only you see the details.</p>
+<div id="authGate" class="gate warn">Checking login...</div>
+<div id="myLostList" style="margin-bottom:16px"></div>
+
+<form id="lostForm">
+<div class="field"><label>What did you lose? *</label><input id="itemName" placeholder="Black Samsung phone" required><small>Example: Black Samsung phone with small crack near bottom-right. Be specific — helps matching.</small></div>
+<div class="row"><div class="field"><label>Where did you lose it? *</label><input id="lostLocation" placeholder="Library, 2nd floor" required><small>Campus location, not GPS. Ex: Library, Cafeteria, Lab 201</small></div><div class="field"><label>When did you lose it? *</label><input id="lostDate" type="date" required></div></div>
+<div class="field"><label>Approximate time *</label><div class="time-row"><select id="lostHour" required><option value="">Hour</option><option value="01">01</option><option value="02">02</option><option value="03">03</option><option value="04">04</option><option value="05">05</option><option value="06">06</option><option value="07">07</option><option value="08">08</option><option value="09">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option></select><select id="lostMinute" required><option value="">Min</option><option value="00">00</option><option value="05">05</option><option value="10">10</option><option value="15">15</option><option value="20">20</option><option value="25">25</option><option value="30">30</option><option value="35">35</option><option value="40">40</option><option value="45">45</option><option value="50">50</option><option value="55">55</option></select><select id="lostAmPm" required><option value="">AM/PM</option><option value="AM">AM</option><option value="PM">PM</option></select></div></div>
+<div class="field"><label>Describe it (helps matching)</label><textarea id="itemDescription" rows="3" placeholder="Black case, small crack near bottom-right corner, lock screen shows mountains wallpaper"></textarea><small>Distinct marks, color, brand, case — the more specific, the better the match.</small></div>
+
+<div class="field"><label>Photo — optional, up to 10MB (camera or gallery)</label><div class="upload"><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;"><label style="flex:1;cursor:pointer;background:#0f172a;color:white;padding:10px;border-radius:10px;text-align:center;font-weight:700;font-size:13px;">📁 Gallery<input type="file" id="photoGallery" accept="image/*" style="display:none"></label><button type="button" id="openCameraBtn" style="flex:1;background:#e0f2fe;border:1px solid #7dd3fc;color:#0c4a6e;padding:10px;border-radius:10px;font-weight:700;font-size:13px;">📸 Camera</button><input type="file" id="photoCamera" accept="image/*" capture="environment" style="display:none"></div><div id="cameraBox" style="display:none"><video id="cameraVideo" autoplay playsinline style="width:100%;border-radius:12px;background:#000;max-height:280px"></video><canvas id="cameraCanvas" style="display:none"></canvas><div style="display:flex;gap:8px;margin-top:8px"><button type="button" id="captureBtn" style="flex:1;background:#16a34a;color:white;padding:10px;border-radius:10px;font-weight:700;border:none;">Capture</button><button type="button" id="closeCameraBtn" style="flex:1;background:#fee2e2;color:#991b1b;padding:10px;border-radius:10px;font-weight:700;border:none;">Close</button></div></div><div id="preview"></div><small>JPG/PNG up to 10MB. Auto-compressed for quick upload. Photo helps verification.</small></div></div>
+
+<button type="submit" id="submitBtn" class="btn-primary">Report lost item — takes 30 sec</button>
+<button type="button" id="searchBtn" class="btn-secondary">🔍 Check for possible matches now</button>
+<p style="font-size:11px;color:#94a3b8;text-align:center;margin-top:12px">Your report is private and linked to your account. We create a generic campus alert like “Someone lost an item” without revealing details.</p>
+</form>
+</div>
+<div id="results"></div>
+</div>
+
 <script type="module">
 import { getCurrentUser, onAuthChange, authFetch } from "./public/js/auth.js";
-let photoData=""; let currentUser=null;
-function renderUser(){ const p=document.getElementById("userPill"); currentUser=getCurrentUser(); p.textContent=currentUser? (currentUser.displayName||currentUser.email) : "Guest can report"; }
-onAuthChange(renderUser); renderUser();
-async function handleFile(file){
-  if(!file) return;
-  const reader=new FileReader();
-  reader.onload=function(ev){
-    photoData=ev.target.result;
-    document.getElementById("preview").innerHTML='<img src="'+photoData+'" style="width:100px;height:100px;object-fit:cover;border-radius:10px">';
-  };
-  reader.readAsDataURL(file);
-}
-document.getElementById("photoGallery").addEventListener("change",function(e){ handleFile(e.target.files[0]); });
-document.getElementById("foundForm").addEventListener("submit", async function(ev){
-  ev.preventDefault();
-  const item=document.getElementById("foundItem").value.trim();
-  const loc=document.getElementById("foundLocation").value.trim();
-  const date=document.getElementById("foundDate").value;
-  const desc=document.getElementById("foundDescription").value.trim();
-  const btn=document.getElementById("submitBtn"); btn.disabled=true; btn.textContent="Saving...";
+let currentUser=null;
+function renderGate(){const g=document.getElementById("authGate");const pill=document.getElementById("userPill");currentUser=getCurrentUser();if(!currentUser){g.className="gate warn";g.innerHTML=`<strong>Not logged in</strong> — <a href="/" style="font-weight:800;color:#0f172a;">Log in from homepage</a> to report. Verified email required.`;pill.textContent="Not logged in";return;}if(!currentUser.emailVerified){g.className="gate warn";g.innerHTML=`<strong>${currentUser.displayName||currentUser.email}</strong> — email not verified. Check inbox.`;pill.textContent="Unverified";return;}g.className="gate ok";g.innerHTML=`<strong>Verified ✓</strong> ${currentUser.displayName||currentUser.email} • Ready to report. Your report stays private.`;pill.textContent=(currentUser.displayName||"User")+" ✓";loadMyLost();}
+async function loadMyLost(){const c=document.getElementById("myLostList");if(!currentUser?.emailVerified){c.innerHTML="";return;}try{const r=await authFetch("/api/my-lost");const j=await r.json();if(j.count>0){c.innerHTML=`<div style="padding:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;font-size:12px;"><strong>Your private reports (${j.count})</strong> • ${j.data.slice(0,2).map(i=>`${i.item} (${new Date(i.createdAt).toLocaleDateString()})`).join(" • ")}</div>`}else c.innerHTML="";}catch{}}
+onAuthChange(renderGate);renderGate();
+
+// Photo logic - 10MB + camera
+let photoData=""; let stream=null;
+const gallery=document.getElementById("photoGallery"); const cameraFile=document.getElementById("photoCamera");
+const cameraBox=document.getElementById("cameraBox"); const video=document.getElementById("cameraVideo"); const canvas=document.getElementById("cameraCanvas"); const preview=document.getElementById("preview");
+function compress(d,maxW=1280,q=0.7){return new Promise(res=>{const img=new Image();img.onload=()=>{const s=Math.min(1,maxW/img.width);const c=document.createElement('canvas');c.width=img.width*s;c.height=img.height*s;c.getContext('2d').drawImage(img,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',q));};img.src=d;});}
+async function handle(f){if(!f)return;const r=new FileReader();r.onload=async (e) => {let d=e.target.result;if(d.length>500*1024)d=await compress(d);photoData=d;preview.innerHTML=`<div style="display:flex;gap:8px;align-items:center;margin-top:8px"><img src="${d}" style="width:100px;height:100px;object-fit:cover;border-radius:10px;border:1px solid #e2e8f0"><div><button type="button" onclick="photoData='';document.getElementById('preview').innerHTML=''" style="background:#fee2e2;border:none;padding:6px 10px;border-radius:8px;cursor:pointer">Remove</button><br><small style="color:#64748b">${(d.length/1024).toFixed(0)}KB</small></div></div>`;});r.readAsDataURL(f);}
+gallery.addEventListener("change",()=>handle(gallery.files[0])); cameraFile.addEventListener("change",()=>handle(cameraFile.files[0]));
+document.getElementById("openCameraBtn").onclick=async()=>{cameraFile.click();try{if(navigator.mediaDevices?.getUserMedia){stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});video.srcObject=stream;cameraBox.style.display="block";}}catch{}};
+document.getElementById("closeCameraBtn").onclick=()=>{cameraBox.style.display="none";if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}};
+document.getElementById("captureBtn").onclick=async()=>{const ctx=canvas.getContext('2d');canvas.width=video.videoWidth;canvas.height=video.videoHeight;ctx.drawImage(video,0,0);let d=canvas.toDataURL('image/jpeg',0.8);d=await compress(d);photoData=d;preview.innerHTML=`<img src="${d}" style="width:120px;height:120px;object-fit:cover;border-radius:10px"><button type="button" onclick="photoData='';document.getElementById('preview').innerHTML=''" style="margin-left:8px;background:#fee2e2;border:none;padding:6px 10px;border-radius:8px">Remove</button>`;cameraBox.style.display="none";if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}};
+
+function getStrength(conf){if(conf>=85)return{label:"High",cls:"high"};if(conf>=70)return{label:"Medium",cls:"medium"};return{label:"Low",cls:"low"};}
+function formatFactors(factors){if(!factors||factors.length===0)return["Similar description"];return factors;}
+
+document.getElementById("lostForm").addEventListener("submit",async(e)=>{
+  e.preventDefault(); if(!currentUser||!currentUser.emailVerified){alert("Please log in and verify email from homepage");return;}
+  const item=document.getElementById("itemName").value.trim(); const loc=document.getElementById("lostLocation").value.trim(); const date=document.getElementById("lostDate").value;
+  const h=document.getElementById("lostHour").value; const m=document.getElementById("lostMinute").value; const ap=document.getElementById("lostAmPm").value; const desc=document.getElementById("itemDescription").value.trim();
+  if(!item||!loc||!date){alert("Item, location, date required");return;}
+  let ch=h; if(h){let nh=parseInt(h,10); if(ap==="AM"&&nh===12)nh=0; if(ap==="PM"&&nh!==12)nh+=12; ch=String(nh).padStart(2,"0");}
+  const dateTime=date&&ch&&m?`${date}T${ch}:${m}:00`:"";
+  const btn=document.getElementById("submitBtn"); btn.disabled=true; btn.textContent="Saving and checking matches...";
+  const results=document.getElementById("results"); results.innerHTML=`<div style="padding:16px;background:white;border:1px solid #e2e8f0;border-radius:16px;margin-top:16px"><p style="font-size:13px;color:#64748b">🔍 Analyzing reports for possible matches...</p></div>`;
   try{
-    const res=await authFetch("/api/found",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({item,location:loc,date,description:desc,photo:photoData})});
-    const json=await res.json();
-    if(!res.ok) throw new Error(json.message);
-    document.getElementById("results").innerHTML='<div style="margin-top:16px;padding:16px;background:#f0fdf4;border:2px solid #16a34a;border-radius:16px">✅ Saved! Thanks for helping.</div>';
-    document.getElementById("foundForm").reset(); document.getElementById("preview").innerHTML=""; photoData="";
-  }catch(err){ document.getElementById("results").innerHTML='Error: '+err.message; }
-  finally{ btn.disabled=false; btn.textContent="Report found item"; }
+    const res=await authFetch("/api/lost",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({item,location:loc,date,dateTime,description:desc,photo:photoData,hour:h,minute:m,amPm:ap})});
+    const json=await res.json(); if(!res.ok||!json.success) throw new Error(json.message||"Failed");
+    let html=`<div style="margin-top:16px;padding:16px;background:#f0fdf4;border:2px solid #16a34a;border-radius:16px"><h3 style="color:#14532d;font-size:15px">✅ Report saved — ID ${json.data.id}</h3><p style="font-size:12px;color:#15803d;margin-top:4px">Private to you. Generic campus alert created. Now checking for possible matches...</p></div>`;
+    if(json.relevantMatches?.length>0){
+      html+=`<div style="margin-top:16px"><h2 style="font-size:18px;font-weight:900">Possible matches found — ${json.relevantMatches.length}</h2><p style="font-size:12px;color:#64748b;margin-bottom:12px">We found ${json.relevantMatches.length} found report(s) that might be yours. Review carefully — these are possibilities, not guarantees.</p>`;
+      json.relevantMatches.forEach(mm=>{
+        const f=mm.foundItem; const s=getStrength(mm.confidence); const factors=formatFactors(mm.matchedFactors);
+        html+=`<div class="match-card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><span class="pill">Found report</span><span class="strength ${s.cls}">${s.label} match</span></div>
+        <div style="display:grid;grid-template-columns:80px 1fr;gap:12px"><div style="width:80px;height:80px;border-radius:12px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;overflow:hidden">${f.photo?`<img src="${f.photo}" style="width:100%;height:100%;object-fit:cover">`:'📦'}</div>
+        <div><h3>${f.item}</h3><p style="font-size:12px;color:#64748b">Found @ ${f.location} • ${f.date}${f.description?` • ${f.description.slice(0,100)}...`:''}</p></div></div>
+        <div style="margin-top:12px;padding:10px;background:white;border-radius:10px;border:1px solid #dcfce7"><p style="font-size:11px;font-weight:800;letter-spacing:.06em;color:#14532d;margin-bottom:6px">WHY WE THINK IT MATCHES</p>${factors.map(fc=>`<div style="font-size:12px;margin-bottom:4px">✓ ${fc}</div>`).join("")}</div>
+        <div style="display:flex;gap:8px;margin-top:12px"><a href="match.html?found=${f.id}&lost=${json.data.id}" style="flex:1;background:#0f172a;color:white;padding:10px;border-radius:10px;text-align:center;font-weight:700;text-decoration:none;font-size:13px">This looks like my item →</a><button onclick="this.closest('.match-card').style.opacity=.5" style="flex:1;background:white;border:1px solid #e2e8f0;padding:10px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer">Not my item</button></div></div>`;
+      });
+      html+=`</div>`;
+    }else{
+      html+=`<div style="margin-top:16px;padding:16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:16px"><h3 style="font-size:14px">No possible matches yet</h3><p style="font-size:12px;color:#7c2d12;margin-top:4px">We'll keep checking as new found reports arrive. You'll get a private notification 🔔 if a possible match appears.</p></div>`;
+    }
+    results.innerHTML=html; results.scrollIntoView({behavior:'smooth'});
+    document.getElementById("lostForm").reset(); preview.innerHTML=""; photoData=""; loadMyLost();
+  }catch(err){results.innerHTML=`<div style="padding:16px;background:#fef2f2;border:1px solid #fecaca;border-radius:12px;margin-top:16px"><p style="font-size:13px;color:#991b1b">Something went wrong while submitting your report. Please try again. ${err.message}</p></div>`;}
+  finally{btn.disabled=false; btn.textContent="Report lost item — takes 30 sec";}
 });
+
+document.getElementById("searchBtn").onclick=async()=>{
+  const item=document.getElementById("itemName").value.trim(); const loc=document.getElementById("lostLocation").value.trim(); const date=document.getElementById("lostDate").value; const desc=document.getElementById("itemDescription").value.trim();
+  if(!item){alert("Enter what you lost to search");return;}
+  const btn=document.getElementById("searchBtn"); btn.disabled=true; btn.textContent="Analyzing reports...";
+  const results=document.getElementById("results"); results.innerHTML=`<div style="padding:16px;background:white;border:1px solid #e2e8f0;border-radius:12px;margin-top:16px"><p style="font-size:13px;color:#64748b">🔍 Analyzing reports for possible matches...</p></div>`;
+  try{
+    const res=await authFetch("/api/match",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({item,location:loc,description:desc,date,photo:photoData})});
+    const json=await res.json(); const matches=(json.matches||[]).filter(m=>m.confidence>=50);
+    if(matches.length===0){results.innerHTML=`<div style="padding:16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;margin-top:16px"><p style="font-size:13px">No possible matches found yet. We'll keep checking.</p></div>`;return;}
+    let html=`<div style="margin-top:16px"><h3 style="font-size:16px;font-weight:900">Possible matches — ${matches.length}</h3>`;
+    matches.forEach(mm=>{
+      const f=mm.foundItem; const s=getStrength(mm.confidence);
+      html+=`<div class="match-card"><div style="display:flex;justify-content:space-between"><span class="pill">Found</span><span class="strength ${s.cls}">${s.label}</span></div><h3 style="margin-top:8px">${f.item}</h3><p style="font-size:12px;color:#64748b">${f.location} • ${f.date}</p><div style="margin-top:8px;font-size:12px">${(mm.matchedFactors||[]).map(x=>`✓ ${x}`).join("<br>")}</div><a href="match.html?found=${f.id}" style="display:block;margin-top:10px;background:#0f172a;color:white;padding:10px;border-radius:10px;text-align:center;text-decoration:none;font-weight:700;font-size:13px">View possible match →</a></div>`;
+    });
+    html+=`</div>`; results.innerHTML=html;
+  }catch(e){results.innerHTML=`<div style="padding:12px;background:#fef2f2;border-radius:12px;margin-top:16px">Error: ${e.message}</div>`;}
+  finally{btn.disabled=false; btn.textContent="🔍 Check for possible matches now";}
+};
 </script>
 </body>
 </html>

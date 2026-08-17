@@ -33,7 +33,7 @@ h1{font-size:28px;font-weight:900;letter-spacing:-.03em;line-height:1.1;margin-b
 </style>
 </head>
 <body>
-<div class="topbar"><a href="index.html" style="font-weight:900;text-decoration:none;color:#0f172a">← CampusFind</a><span id="userPill" style="font-size:12px;font-weight:700"></span></div>
+<div class="topbar"><a href="/" style="font-weight:900;text-decoration:none;color:#0f172a">← CampusFind</a><span id="userPill" style="font-size:12px;font-weight:700"></span></div>
 <div class="form-wrap">
 <div class="card">
 <p class="eyebrow">REPORT LOST • PRIVATE • 30 SECONDS</p>
@@ -61,7 +61,7 @@ h1{font-size:28px;font-weight:900;letter-spacing:-.03em;line-height:1.1;margin-b
 <script type="module">
 import { getCurrentUser, onAuthChange, authFetch } from "./public/js/auth.js";
 let currentUser=null;
-function renderGate(){const g=document.getElementById("authGate");const pill=document.getElementById("userPill");currentUser=getCurrentUser();if(!currentUser){g.className="gate warn";g.innerHTML=`<strong>Not logged in</strong> — <a href="index.html" style="font-weight:800;color:#0f172a;">Log in from homepage</a> to report. Verified email required.`;pill.textContent="Not logged in";return;}if(!currentUser.emailVerified){g.className="gate warn";g.innerHTML=`<strong>${currentUser.displayName||currentUser.email}</strong> — email not verified. Check inbox.`;pill.textContent="Unverified";return;}g.className="gate ok";g.innerHTML=`<strong>Verified ✓</strong> ${currentUser.displayName||currentUser.email} • Ready to report. Your report stays private.`;pill.textContent=(currentUser.displayName||"User")+" ✓";loadMyLost();}
+function renderGate(){const g=document.getElementById("authGate");const pill=document.getElementById("userPill");currentUser=getCurrentUser();if(!currentUser){g.className="gate warn";g.innerHTML=`<strong>Not logged in</strong> — <a href="/" style="font-weight:800;color:#0f172a;">Log in from homepage</a> to report. Verified email required.`;pill.textContent="Not logged in";return;}if(!currentUser.emailVerified){g.className="gate warn";g.innerHTML=`<strong>${currentUser.displayName||currentUser.email}</strong> — email not verified. Check inbox.`;pill.textContent="Unverified";return;}g.className="gate ok";g.innerHTML=`<strong>Verified ✓</strong> ${currentUser.displayName||currentUser.email} • Ready to report. Your report stays private.`;pill.textContent=(currentUser.displayName||"User")+" ✓";loadMyLost();}
 async function loadMyLost(){const c=document.getElementById("myLostList");if(!currentUser?.emailVerified){c.innerHTML="";return;}try{const r=await authFetch("/api/my-lost");const j=await r.json();if(j.count>0){c.innerHTML=`<div style="padding:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;font-size:12px;"><strong>Your private reports (${j.count})</strong> • ${j.data.slice(0,2).map(i=>`${i.item} (${new Date(i.createdAt).toLocaleDateString()})`).join(" • ")}</div>`}else c.innerHTML="";}catch{}}
 onAuthChange(renderGate);renderGate();
 let photoData=""; let stream=null;

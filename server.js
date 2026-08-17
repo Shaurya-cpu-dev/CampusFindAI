@@ -8,7 +8,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "25mb" }));
 app.use(express.static(__dirname));
 app.use("/public", express.static(path.join(__dirname, "public")));
 
@@ -354,7 +354,7 @@ app.post("/api/found", optionalVerifyFirebaseToken, async (req,res)=>{
         if(item.trim().length>100) return res.status(400).json({success:false,message:"Item name too long (max 100)."});
         if(location.trim().length>150) return res.status(400).json({success:false,message:"Location too long (max 150)."});
         if(description.trim().length>1000) return res.status(400).json({success:false,message:"Description too long (max 1000)."});
-        if(photo&&typeof photo==="string"&&photo.length>7*1024*1024) return res.status(400).json({success:false,message:"Photo too large. Max ~2MB image."});
+        if(photo&&typeof photo==="string"&&photo.length>20*1024*1024) return res.status(400).json({success:false,message:"Photo too large. Max ~10MB image."});
         const newItem={ id:id?Number(id):Date.now(), item:item.trim(), location:location.trim(), date:date.trim(), dateTime:(dateTime||"").trim(), description:description.trim(), photo:photo||"", createdAt:new Date().toISOString(), status:"found" };
         const items=readFoundItems(); items.push(newItem); writeFoundItems(items);
         createNotification({
@@ -415,7 +415,7 @@ app.post("/api/lost", verifyFirebaseToken, requireVerifiedEmail, async (req,res)
         if(item.trim().length>100) return res.status(400).json({success:false,message:"Item name too long."});
         if(location.trim().length>150) return res.status(400).json({success:false,message:"Location too long."});
         if(description.trim().length>1000) return res.status(400).json({success:false,message:"Description too long."});
-        if(photo&&typeof photo==="string"&&photo.length>7*1024*1024) return res.status(400).json({success:false,message:"Photo too large."});
+        if(photo&&typeof photo==="string"&&photo.length>20*1024*1024) return res.status(400).json({success:false,message:"Photo too large."});
         // IMPORTANT: ownerUid from verified token, NOT client
         const ownerUid = req.user.uid;
         const ownerNickname = req.user.displayName || req.user.name || "User";
@@ -714,7 +714,7 @@ app.post("/api/match", optionalVerifyFirebaseToken, async (req,res)=>{
         if(lostItemName.length>100) return res.status(400).json({success:false,message:"Item name too long."});
         if(lostLoc.length>150) return res.status(400).json({success:false,message:"Location too long."});
         if(lostDesc.length>1000) return res.status(400).json({success:false,message:"Description too long."});
-        if(photo&&typeof photo==="string"&&photo.length>7*1024*1024) return res.status(400).json({success:false,message:"Photo too large. Max ~2MB."});
+        if(photo&&typeof photo==="string"&&photo.length>20*1024*1024) return res.status(400).json({success:false,message:"Photo too large. Max ~10MB."});
         const lostReport={ item:lostItemName, itemName:lostItemName, location:lostLoc, lostLocation:lostLoc, description:lostDesc, itemDescription:lostDesc, date:lostDateStr, lostDate:lostDateStr, dateTime:dateTime||lostDateTime||"", hour:hour||lostHour||"", minute:minute||lostMinute||"", amPm:amPm||lostAmPm||"", photo:photo||"", status:"lost", id:Date.now() };
         const allFound=readFoundItems();
         if(allFound.length===0) return res.json({success:true,matches:[],message:"No found items in database yet",aiUsed:aiConfigured,source:aiConfigured?"ai":"fallback"});

@@ -1,181 +1,162 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Report Lost Item - CampusFind AI - Gemini + Firebase UID</title>
-    <link rel="stylesheet" href="public/css/style.css">
-    <style>
-      .auth-gate{padding:16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;margin-bottom:16px}
-      .auth-gate.ok{background:#f0fdf4;border-color:#bbf7d0}
-    </style>
-</head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Report Lost Item - CampusFind AI</title><link rel="stylesheet" href="public/css/style.css"><style>.auth-gate{padding:16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;margin-bottom:16px}.auth-gate.ok{background:#f0fdf4;border-color:#bbf7d0}</style></head>
 <body>
-    <header>
-        <h2>CampusFind AI • Gemini • Firebase Auth</h2>
-        <div style="display:flex;gap:12px;align-items:center;">
-            <span id="userPill"></span>
-            <a href="index.html">← Back Home</a>
-        </div>
-    </header>
-    <main class="lost-page">
-        <div class="page-head">
-            <div class="eyebrow">PRIVATE LOST REPORT • FIREBASE UID OWNERSHIP • VERIFIED EMAIL REQUIRED</div>
-            <h1>Report your lost item</h1>
-            <p>Your report is saved <strong>privately</strong> with your Firebase UID as ownerUid (server-verified via ID token). Global generic notification only: <em>"Someone reported an item lost"</em> — no email/phone exposed. Backend never trusts client ownerUid.</p>
-            <div id="authGate" class="auth-gate">Checking Firebase Auth...</div>
-            <div id="aiStatusBadge" style="margin-top:12px;display:inline-flex;gap:8px;align-items:center;padding:8px 12px;border-radius:999px;background:#eef2ff;border:1px solid #dbeafe;font-size:12px;font-weight:700;">Checking Gemini status...</div>
-            <div id="privacyNote" style="margin-top:10px;padding:10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;font-size:12px;color:#9a3412;">🔒 Privacy: Lost report private with ownerUid. Email never publicly displayed. Global notification generic. Token verified server-side via firebase-admin.</div>
-            <div id="myLostList" style="margin-top:12px;"></div>
-        </div>
-        <form class="lost-form" id="lostForm">
-            <div class="form-grid">
-                <div class="field-group">
-                    <label for="itemName">What did you lose? <span>*</span></label>
-                    <input type="text" id="itemName" placeholder="Example: Black Samsung phone with crack near bottom-right" required>
-                </div>
-                <div class="field-row">
-                    <div class="field-group">
-                        <label for="lostLocation">Where did you lose it? <span>*</span></label>
-                        <input type="text" id="lostLocation" placeholder="College library, 2nd floor" required>
-                    </div>
-                    <div class="field-group">
-                        <label for="lostDate">When did you lose it? <span>*</span></label>
-                        <input type="date" id="lostDate" required>
-                    </div>
-                </div>
-                <div class="field-group">
-                    <label>What time did you lose it? <span>*</span></label>
-                    <div class="time-select-row">
-                        <select id="lostHour" required><option value="">Hour</option><option value="01">01</option><option value="02">02</option><option value="03">03</option><option value="04">04</option><option value="05">05</option><option value="06">06</option><option value="07">07</option><option value="08">08</option><option value="09">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option></select>
-                        <select id="lostMinute" required><option value="">Minute</option><option value="00">00</option><option value="05">05</option><option value="10">10</option><option value="15">15</option><option value="20">20</option><option value="25">25</option><option value="30">30</option><option value="35">35</option><option value="40">40</option><option value="45">45</option><option value="50">50</option><option value="55">55</option></select>
-                        <select id="lostAmPm" required><option value="">AM / PM</option><option value="AM">AM</option><option value="PM">PM</option></select>
-                    </div>
-                </div>
-                <div class="field-group">
-                    <label for="itemDescription">Describe the item in detail</label>
-                    <textarea id="itemDescription" placeholder="Example: Black Samsung phone, small crack near bottom-right corner, lost near library yesterday afternoon. Include color, brand, distinctive marks..."></textarea>
-                    <div class="hint">Private: used for Gemini matching only. OwnerUid enforced server-side. Email never stored in notification.</div>
-                </div>
-                <div class="field-group">
-                    <label for="lostPhoto">Photo (optional - future image AI)</label>
-                    <div class="upload-zone">
-                        <input type="file" id="lostPhoto" accept="image/*">
-                        <div class="hint">JPG/PNG up to 2MB. Stored privately; hasPhoto signal used. Future: Gemini vision model will analyze images.</div>
-                        <div id="lostPreviewContainer"></div>
-                    </div>
-                </div>
-                <button type="submit" id="submitPrivateBtn">Save private lost report → Global notification (UID owned)</button>
-                <p class="hint" style="text-align:center" id="privateStatus">POST /api/lost with Authorization: Bearer <id-token> • Verified email required • ownerUid set server-side.</p>
-                <hr style="margin:20px 0;border:none;border-top:1px solid #e2e8f0;">
-                <button type="button" id="searchBtn" style="width:100%;background:white;color:var(--text);border:1px solid var(--border);">Search with Gemini → POST /api/match</button>
-                <p class="hint" style="text-align:center" id="searchStatus">After private save, search against found reports via REAL Gemini embeddings + reasoning.</p>
-            </div>
-        </form>
-        <div id="matchResultsContainer"></div>
-    </main>
-    <script type="module">
-        import { getCurrentUser, authFetch, onAuthChange, getIdTokenForced } from "./public/js/auth.js";
+<header><h2>CampusFind AI • Lost Report • 10MB + Camera</h2><div style="display:flex;gap:12px;align-items:center;"><span id="userPill"></span><a href="index.html">← Back Home</a></div></header>
+<main class="lost-page">
+<div class="page-head"><div class="eyebrow">PRIVATE LOST • 10MB PHOTO • CAMERA DIRECT</div><h1>Report your lost item</h1><p>Private report with UID ownership. Photo 10MB max, auto-compressed. Take photo directly from camera or gallery.</p><div id="authGate" class="auth-gate">Checking Auth...</div><div id="myLostList" style="margin-top:12px;"></div></div>
+<form class="lost-form" id="lostForm">
+<div class="form-grid">
+<div class="field-group"><label for="itemName">What did you lose? *</label><input type="text" id="itemName" placeholder="Black Samsung phone crack" required></div>
+<div class="field-row"><div class="field-group"><label for="lostLocation">Where? *</label><input type="text" id="lostLocation" placeholder="Library 2nd floor" required></div><div class="field-group"><label for="lostDate">When? *</label><input type="date" id="lostDate" required></div></div>
+<div class="field-group"><label>Time? *</label><div class="time-select-row"><select id="lostHour" required><option value="">Hour</option><option value="01">01</option><option value="02">02</option><option value="03">03</option><option value="04">04</option><option value="05">05</option><option value="06">06</option><option value="07">07</option><option value="08">08</option><option value="09">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option></select><select id="lostMinute" required><option value="">Min</option><option value="00">00</option><option value="05">05</option><option value="10">10</option><option value="15">15</option><option value="20">20</option><option value="25">25</option><option value="30">30</option><option value="35">35</option><option value="40">40</option><option value="45">45</option><option value="50">50</option><option value="55">55</option></select><select id="lostAmPm" required><option value="">AM/PM</option><option value="AM">AM</option><option value="PM">PM</option></select></div></div>
+<div class="field-group"><label for="itemDescription">Describe in detail</label><textarea id="itemDescription" placeholder="Black Samsung, crack bottom-right..."></textarea></div>
 
-        async function loadAIStatus(){
-            const badge=document.getElementById("aiStatusBadge");
-            try{
-                const res=await fetch("/api/status");
-                const json=await res.json();
-                if(json.ai?.configured){
-                    badge.textContent=`✓ ${json.ai.status} • Gemini • ${json.ai.embeddingModel} + ${json.ai.chatModel} • Firebase Admin ${json.auth.firebaseAdminConfigured?"✓":"✗ set env var"}`;
-                    badge.style.background="#f0fdf4"; badge.style.borderColor="#bbf7d0"; badge.style.color="#15803d";
-                } else {
-                    badge.textContent=`⚠ ${json.ai?.status||"Fallback"} — Set GEMINI_API_KEY for real Gemini`;
-                    badge.style.background="#fff7ed"; badge.style.borderColor="#fed7aa"; badge.style.color="#9a3412";
-                }
-            }catch(e){ badge.textContent="Status check failed"; }
+<!-- NEW PHOTO WITH CAMERA -->
+<div class="field-group"><label>Photo (optional) - 10MB - Camera or Gallery</label>
+<div class="upload-zone" style="padding:12px;">
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+<label style="flex:1;cursor:pointer;background:#0f172a;color:white;padding:12px;border-radius:10px;text-align:center;font-weight:700;font-size:13px;">📁 Gallery<input type="file" id="photoGallery" accept="image/*" style="display:none;"></label>
+<button type="button" id="openCameraBtn" style="flex:1;background:#e0f2fe;border:1px solid #7dd3fc;color:#0c4a6e;padding:12px;border-radius:10px;font-weight:700;">📸 Camera</button>
+<input type="file" id="photoCamera" accept="image/*" capture="environment" style="display:none;">
+</div>
+<div id="cameraBox" style="display:none;margin-bottom:10px;">
+<video id="cameraVideo" autoplay playsinline style="width:100%;border-radius:12px;background:#000;max-height:320px;"></video>
+<canvas id="cameraCanvas" style="display:none;"></canvas>
+<div style="display:flex;gap:8px;margin-top:8px;">
+<button type="button" id="captureBtn" style="flex:1;background:#22c55e;color:white;padding:10px;border-radius:10px;font-weight:700;border:none;">✅ Capture</button>
+<button type="button" id="closeCameraBtn" style="flex:1;background:#fee2e2;color:#991b1b;padding:10px;border-radius:10px;font-weight:700;border:none;">✕ Close</button>
+</div>
+</div>
+<div id="lostPreviewContainer"></div>
+<small style="color:#64748b;">Up to 10MB. Auto-compressed to ~200KB. Supports direct camera.</small>
+</div>
+</div>
+
+<button type="submit" id="submitPrivateBtn">Save private lost report → Matches ≥70%</button>
+<button type="button" id="searchBtn" style="width:100%;margin-top:10px;background:white;border:1px solid #e2e8f0;padding:12px;border-radius:10px;font-weight:700;cursor:pointer;">🔍 Search Gemini (≥70%)</button>
+</div>
+</form>
+<div id="matchResultsContainer"></div>
+</main>
+<script type="module">
+import { getCurrentUser, authFetch, onAuthChange } from "./public/js/auth.js";
+let currentUser=null;
+function renderGate(){const gate=document.getElementById("authGate");const pill=document.getElementById("userPill");currentUser=getCurrentUser();if(!currentUser){gate.className="auth-gate";gate.innerHTML=`<strong>Not logged in</strong> — <a href="index.html">Login</a>`;pill.innerHTML=`<span style="font-size:12px;background:#fee2e2;padding:6px 10px;border-radius:999px;">Not logged</span>`;return;}if(!currentUser.emailVerified){gate.className="auth-gate";gate.innerHTML=`<strong>${currentUser.displayName||currentUser.email}</strong> unverified`;pill.innerHTML=`<span style="font-size:12px;background:#fff7ed;padding:6px 10px;border-radius:999px;">Unverified</span>`;return;}gate.className="auth-gate ok";gate.innerHTML=`<strong>Verified ✓</strong> ${currentUser.displayName||currentUser.email} • UID ${currentUser.uid.slice(0,8)}... • 10MB + Camera ready`;pill.innerHTML=`<span style="font-size:12px;background:#f0fdf4;padding:6px 10px;border-radius:999px;">${currentUser.displayName||"User"} ✓</span>`;loadMyLost();}
+async function loadMyLost(){const c=document.getElementById("myLostList");if(!currentUser?.emailVerified){c.innerHTML="";return;}try{const r=await authFetch("/api/my-lost");const j=await r.json();if(j.count>0){c.innerHTML=`<div style="padding:10px;background:white;border:1px solid #e2e8f0;border-radius:10px;font-size:12px;">Your private reports (${j.count}): ${j.data.slice(0,3).map(i=>`${i.item} ID ${i.id}`).join(", ")}</div>`;}else c.innerHTML=`<div style="padding:10px;background:white;border-radius:10px;font-size:12px;">No private reports yet</div>`;}catch{}}
+onAuthChange(renderGate);renderGate();
+
+// CAMERA + 10MB LOGIC
+let photoDataGlobal="";
+let stream=null;
+const galleryInput=document.getElementById("photoGallery");
+const cameraInput=document.getElementById("photoCamera");
+const cameraBox=document.getElementById("cameraBox");
+const video=document.getElementById("cameraVideo");
+const canvas=document.getElementById("cameraCanvas");
+const previewContainer=document.getElementById("lostPreviewContainer");
+
+function compressImage(dataUrl,maxWidth=1280,quality=0.7){
+    return new Promise(resolve=>{
+        const img=new Image();
+        img.onload=()=>{
+            const scale=Math.min(1,maxWidth/img.width);
+            const w=img.width*scale,h=img.height*scale;
+            const c=document.createElement('canvas');c.width=w;c.height=h;
+            c.getContext('2d').drawImage(img,0,0,w,h);
+            resolve(c.toDataURL('image/jpeg',quality));
+        };
+        img.src=dataUrl;
+    });
+}
+async function handleFile(file){
+    if(!file) return;
+    const reader=new FileReader();
+    reader.onload=async(e)=>{
+        let dataUrl=e.target.result;
+        if(dataUrl.length>500*1024) dataUrl=await compressImage(dataUrl,1280,0.75);
+        photoDataGlobal=dataUrl;
+        previewContainer.innerHTML=`<div class="preview-wrap"><img src="${dataUrl}" style="max-width:220px;border-radius:12px;"><button type="button" onclick="photoDataGlobal='';document.getElementById('lostPreviewContainer').innerHTML='';document.getElementById('photoGallery').value='';document.getElementById('photoCamera').value='';" style="margin-left:8px;background:#fee2e2;border:none;padding:6px 10px;border-radius:8px;">✕ Remove</button><br><small>${(dataUrl.length/1024).toFixed(0)} KB compressed</small></div>`;
+    };
+    reader.readAsDataURL(file);
+}
+galleryInput?.addEventListener("change",()=>handleFile(galleryInput.files[0]));
+cameraInput?.addEventListener("change",()=>handleFile(cameraInput.files[0]));
+document.getElementById("openCameraBtn")?.addEventListener("click", async()=>{
+    cameraInput.click();
+    try{
+        if(navigator.mediaDevices?.getUserMedia){
+            stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+            video.srcObject=stream; cameraBox.style.display="block";
         }
-        loadAIStatus();
+    }catch{}
+});
+document.getElementById("closeCameraBtn")?.addEventListener("click",()=>{
+    cameraBox.style.display="none";
+    if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+});
+document.getElementById("captureBtn")?.addEventListener("click", async()=>{
+    const ctx=canvas.getContext('2d');
+    canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+    ctx.drawImage(video,0,0);
+    let dataUrl=canvas.toDataURL('image/jpeg',0.8);
+    dataUrl=await compressImage(dataUrl,1280,0.75);
+    photoDataGlobal=dataUrl;
+    previewContainer.innerHTML=`<div class="preview-wrap"><img src="${dataUrl}" style="max-width:220px;border-radius:12px;"><button type="button" onclick="photoDataGlobal='';document.getElementById('lostPreviewContainer').innerHTML='';" style="margin-left:8px;background:#fee2e2;border:none;padding:6px 10px;border-radius:8px;">✕ Remove</button></div>`;
+    cameraBox.style.display="none";
+    if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+});
 
-        let currentUser = null;
-        function renderGate(){
-            const gate=document.getElementById("authGate");
-            const pill=document.getElementById("userPill");
-            const btn=document.getElementById("submitPrivateBtn");
-            currentUser = getCurrentUser();
-            if(!currentUser){
-                gate.className="auth-gate";
-                gate.innerHTML=`<strong>Not logged in</strong> — Please login from homepage (Login / Sign up). Verified email required to report lost item. <a href="index.html">Go to home → login</a>`;
-                pill.innerHTML=`<span style="font-size:12px;background:#fee2e2;padding:6px 10px;border-radius:999px;">Not logged in</span>`;
-                btn.disabled=true;
-                btn.textContent="Login & verify email to report lost";
-                return;
-            }
-            if(!currentUser.emailVerified){
-                gate.className="auth-gate";
-                gate.innerHTML=`<strong>Logged in as ${currentUser.displayName||currentUser.email}</strong> but email NOT verified. Check inbox for verification link from Firebase. <button id="resendBtn2" style="margin-left:8px;padding:4px 8px;border-radius:999px;border:1px solid #fed7aa;background:white;cursor:pointer;font-size:11px;">Resend email</button>`;
-                pill.innerHTML=`<span style="font-size:12px;background:#fff7ed;padding:6px 10px;border-radius:999px;">${currentUser.displayName||"User"} • Unverified</span>`;
-                btn.disabled=true;
-                btn.textContent="Verify email to report lost (check inbox)";
-                document.getElementById("resendBtn2")?.addEventListener("click", async ()=>{
-                    try{
-                        const { resendVerification } = await import("./public/js/auth.js");
-                        await resendVerification();
-                        alert("Verification email resent!");
-                    }catch(e){ alert(e.message); }
-                });
-                return;
-            }
-            gate.className="auth-gate ok";
-            gate.innerHTML=`<strong>Verified ✓</strong> Logged in as <strong>${currentUser.displayName||currentUser.email}</strong> (${currentUser.email}) • UID: <code style="font-size:10px;">${currentUser.uid}</code> • You can now report private lost items. OwnerUid enforced server-side.`;
-            pill.innerHTML=`<span style="font-size:12px;background:#f0fdf4;padding:6px 10px;border-radius:999px;">${currentUser.displayName||"User"} • Verified ✓</span>`;
-            btn.disabled=false;
-            btn.textContent="Save private lost report → Global notification (UID owned)";
-            loadMyLost();
-        }
-
-        async function loadMyLost(){
-            const container=document.getElementById("myLostList");
-            if(!currentUser?.emailVerified){ container.innerHTML=""; return; }
-            try{
-                const res=await authFetch("/api/my-lost");
-                const json=await res.json();
-                if(json.count>0){
-                    container.innerHTML=`<div style="padding:10px;background:white;border:1px solid #e2e8f0;border-radius:10px;font-size:12px;"><strong>Your private lost reports (${json.count}) — UID owned:</strong><br>${json.data.map(i=>`• ${i.item} @ ${i.location} (ID ${i.id}) - ${new Date(i.createdAt).toLocaleString()}`).join("<br>")}</div>`;
-                } else container.innerHTML=`<div style="padding:10px;background:white;border:1px solid #e2e8f0;border-radius:10px;font-size:12px;">No private lost reports yet for your UID. Create one below.</div>`;
-            }catch{}
-        }
-
-        onAuthChange(()=>{ renderGate(); });
-        renderGate();
-
-        // Photo preview
-        document.getElementById("lostPhoto")?.addEventListener("change", function(){
-            const file=this.files[0]; if(!file) return;
-            const reader=new FileReader();
-            reader.onload=(e)=>{
-                document.getElementById("lostPreviewContainer").innerHTML=`<div class="preview-wrap"><img src="${e.target.result}" class="photo-preview"><button type="button" class="preview-remove" onclick="document.getElementById('lostPhoto').value='';document.getElementById('lostPreviewContainer').innerHTML='';">✕ Remove</button></div>`;
-                window.lostPhotoData=e.target.result;
-            }; reader.readAsDataURL(file);
-        });
-
-        
-        let lostPhotoData=""; document.getElementById("lostForm").addEventListener("submit", async (e)=>{ e.preventDefault(); if(!currentUser ||!currentUser.emailVerified){ alert("Please login and verify email first."); return; } const itemName=document.getElementById("itemName").value.trim(); const lostLocation=document.getElementById("lostLocation").value.trim(); const lostDate=document.getElementById("lostDate").value; const lostHour=document.getElementById("lostHour").value; const lostMinute=document.getElementById("lostMinute").value; const lostAmPm=document.getElementById("lostAmPm").value; const itemDescription=document.getElementById("itemDescription").value.trim(); if(!itemName||!lostLocation||!lostDate){ alert("Item, location, date required"); return; } let convertedHour=lostHour; if(lostHour){ let numericHour=parseInt(lostHour,10); if(lostAmPm==="AM"&&numericHour===12) numericHour=0; if(lostAmPm==="PM"&&numericHour!==12) numericHour+=12; convertedHour=String(numericHour).padStart(2,"0"); } const lostDateTime=lostDate&&convertedHour&&lostMinute&&lostAmPm?`${lostDate}T${convertedHour}:${lostMinute}:00`:""; const btn=document.getElementById("submitPrivateBtn"); btn.disabled=true; btn.textContent="Saving with UID & finding matches..."; try{ const res=await authFetch("/api/lost",{ method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ item:itemName, location:lostLocation, date:lostDate, dateTime:lostDateTime, description:itemDescription, photo:lostPhotoData||"", hour:lostHour, minute:lostMinute, amPm:lostAmPm }) }); const json=await res.json(); if(!res.ok||!json.success) throw new Error(json.message||"Failed"); 
-        // Show relevant matches >=70%
+// SUBMIT
+document.getElementById("lostForm").addEventListener("submit", async(e)=>{
+    e.preventDefault();
+    if(!currentUser||!currentUser.emailVerified){alert("Login & verify");return;}
+    const itemName=document.getElementById("itemName").value.trim();
+    const lostLocation=document.getElementById("lostLocation").value.trim();
+    const lostDate=document.getElementById("lostDate").value;
+    const lostHour=document.getElementById("lostHour").value;
+    const lostMinute=document.getElementById("lostMinute").value;
+    const lostAmPm=document.getElementById("lostAmPm").value;
+    const itemDescription=document.getElementById("itemDescription").value.trim();
+    if(!itemName||!lostLocation||!lostDate){alert("Item, location, date required");return;}
+    let ch=lostHour; if(lostHour){let nh=parseInt(lostHour,10); if(lostAmPm==="AM"&&nh===12) nh=0; if(lostAmPm==="PM"&&nh!==12) nh+=12; ch=String(nh).padStart(2,"0");}
+    const dateTime=lostDate&&ch&&lostMinute?`${lostDate}T${ch}:${lostMinute}:00`:"";
+    const btn=document.getElementById("submitPrivateBtn"); btn.disabled=true; btn.textContent="Saving + matching ≥70%...";
+    try{
+        const res=await authFetch("/api/lost",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({item:itemName,location:lostLocation,date:lostDate,dateTime,description:itemDescription,photo:photoDataGlobal||"",hour:lostHour,minute:lostMinute,amPm:lostAmPm})});
+        const json=await res.json(); if(!res.ok||!json.success) throw new Error(json.message||"Failed");
         const container=document.getElementById("matchResultsContainer");
-        container.innerHTML="";
-        let html=`<div style="margin:20px 0;padding:16px;background:#f0fdf4;border:2px solid #22c55e;border-radius:16px;"><h3 style="margin:0 0 8px;color:#15803d;">✅ Private lost report saved! ID: ${json.data.id}</h3><p style="font-size:13px;color:#334155;">Owner UID: ${json.data.ownerUid} • Global notification created.</p></div>`;
-        if(json.relevantMatches && json.relevantMatches.length>0){
-            html+=`<div style="margin:20px 0;"><h2 style="font-size:20px;margin-bottom:12px;">🎯 Relevant Found Matches (≥70%) — ${json.relevantMatches.length} found</h2><p style="font-size:13px;color:#64748b;margin-bottom:12px;">These found items match your lost report with ≥70% confidence. Contact via notification system.</p>`;
+        let html=`<div style="margin:20px 0;padding:16px;background:#f0fdf4;border:2px solid #22c55e;border-radius:16px;"><h3 style="color:#15803d;">✅ Saved! ID ${json.data.id}</h3></div>`;
+        if(json.relevantMatches?.length>0){
+            html+=`<div style="margin:20px 0;"><h2>🎯 Found Matches ≥70% — ${json.relevantMatches.length}</h2>`;
             json.relevantMatches.forEach(m=>{
                 const f=m.foundItem;
-                html+=`<div style="padding:14px;background:white;border:1px solid #bbf7d0;border-radius:12px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start;"><div style="font-size:24px;">📦</div><div style="flex:1;"><strong>${f.item}</strong> — ${m.confidence}% match<br><small style="color:#64748b;">Found @ ${f.location} on ${f.date} • ${f.description?.slice(0,120)}...</small><br><small style="color:#15803d;">Reason: ${m.reason||'Similar item type, location, description'} • Factors: ${(m.matchedFactors||[]).join(', ')}</small></div><div style="background:#22c55e;color:white;padding:6px 10px;border-radius:999px;font-weight:800;font-size:12px;">${m.confidence}%</div></div>`;
+                html+=`<div style="padding:14px;background:white;border:1px solid #bbf7d0;border-radius:12px;margin:10px 0;display:flex;gap:12px;"><div>📦</div><div style="flex:1;"><strong>${f.item}</strong> ${m.confidence}%<br><small>@ ${f.location} ${f.date}<br>${f.description?.slice(0,120)}</small></div><div style="background:#22c55e;color:white;padding:6px 10px;border-radius:999px;font-weight:800;">${m.confidence}%</div></div>`;
             });
             html+=`</div>`;
-        } else {
-            html+=`<div style="margin:20px 0;padding:14px;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;"><strong>No strong matches yet (≥70%).</strong><br><small style="color:#9a3412;">Your report is private. When someone reports a matching found item, you'll get a private notification 🔔 in My Matches.</small></div>`;
-        }
-        container.innerHTML=html;
-        container.scrollIntoView({behavior:'smooth'});
-        document.getElementById("lostForm").reset(); document.getElementById("lostPreviewContainer").innerHTML=""; lostPhotoData=""; loadMyLost(); }catch(err){ alert("Error: "+err.message); } finally{ btn.disabled=false; renderGate(); } });
-        document.getElementById("searchBtn").addEventListener("click", async ()=>{ const itemName=document.getElementById("itemName").value.trim(); const lostLocation=document.getElementById("lostLocation").value.trim(); const lostDate=document.getElementById("lostDate").value; const lostHour=document.getElementById("lostHour").value; const lostMinute=document.getElementById("lostMinute").value; const lostAmPm=document.getElementById("lostAmPm").value; const itemDescription=document.getElementById("itemDescription").value.trim(); if(!itemName){ alert("Enter item name to search"); return; } let convertedHour=lostHour; if(lostHour){ let numericHour=parseInt(lostHour,10); if(lostAmPm==="AM"&&numericHour===12) numericHour=0; if(lostAmPm==="PM"&&numericHour!==12) numericHour+=12; convertedHour=String(numericHour).padStart(2,"0"); } const lostDateTime=lostDate&&convertedHour&&lostMinute&&lostAmPm?`${lostDate}T${convertedHour}:${lostMinute}:00`:""; const searchBtn=document.getElementById("searchBtn"); searchBtn.disabled=true; searchBtn.textContent="Calling Gemini..."; const container=document.getElementById("matchResultsContainer"); try{ const res=await authFetch("/api/match",{ method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ item:itemName, location:lostLocation, description:itemDescription, date:lostDate, dateTime:lostDateTime, hour:lostHour, minute:lostMinute, amPm:lostAmPm, photo:lostPhotoData||"" }) }); const json=await res.json(); if(!res.ok||!json.success) throw new Error(json.message||"Matching failed"); const filtered = (json.matches||[]).filter(m=>m.confidence>=70); let html=`<div style="margin:20px 0;"><h2 style="font-size:20px;">🔍 Search Results (≥70%) — ${filtered.length} matches</h2>`; if(filtered.length===0) html+=`<div style="padding:12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;">No matches ≥70%. Try broader description.</div>`; else filtered.forEach(m=>{ const f=m.foundItem; html+=`<div style="padding:12px;background:white;border:1px solid #e2e8f0;border-radius:10px;margin:8px 0;"><strong>${f.item}</strong> ${m.confidence}%<br><small>${f.location} • ${f.date}</small></div>`; }); html+=`</div>`; container.innerHTML=html; }catch(err){ alert(err.message); } finally{ searchBtn.disabled=false; searchBtn.textContent="Search with Gemini → POST /api/match (≥70% only)"; } });
+        }else html+=`<div style="padding:14px;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;">No matches ≥70% yet. You'll get private 🔔 notification when matched.</div>`;
+        container.innerHTML=html; container.scrollIntoView({behavior:'smooth'});
+        document.getElementById("lostForm").reset(); previewContainer.innerHTML=""; photoDataGlobal=""; loadMyLost();
+    }catch(err){alert("Error: "+err.message);}finally{btn.disabled=false; btn.textContent="Save private lost report → Matches ≥70%";}
+});
 
-    </script>
+document.getElementById("searchBtn").addEventListener("click", async()=>{
+    const itemName=document.getElementById("itemName").value.trim();
+    const lostLocation=document.getElementById("lostLocation").value.trim();
+    const lostDate=document.getElementById("lostDate").value;
+    const itemDescription=document.getElementById("itemDescription").value.trim();
+    if(!itemName){alert("Enter item");return;}
+    const btn=document.getElementById("searchBtn"); btn.disabled=true; btn.textContent="Searching...";
+    try{
+        const res=await authFetch("/api/match",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({item:itemName,location:lostLocation,description:itemDescription,date:lostDate,photo:photoDataGlobal||""})});
+        const json=await res.json();
+        const filtered=(json.matches||[]).filter(m=>m.confidence>=70);
+        let html=`<div style="margin:20px 0;"><h2>🔍 Results ≥70% — ${filtered.length}</h2>`;
+        filtered.forEach(m=>{html+=`<div style="padding:12px;background:white;border:1px solid #e2e8f0;border-radius:10px;margin:8px 0;"><strong>${m.foundItem.item}</strong> ${m.confidence}%<br><small>${m.foundItem.location}</small></div>`;});
+        html+=`</div>`;
+        document.getElementById("matchResultsContainer").innerHTML=html;
+    }catch(e){alert(e.message);}finally{btn.disabled=false; btn.textContent="🔍 Search Gemini (≥70%)";}
+});
+</script>
 </body>
 </html>

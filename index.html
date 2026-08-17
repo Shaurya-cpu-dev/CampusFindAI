@@ -1,162 +1,407 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CampusFind - Lost something on campus? Find possible matches fast.</title>
-<link rel="stylesheet" href="style.css">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<style>
-.home-nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.85);backdrop-filter:blur(16px);border-bottom:1px solid #e2e8f0;padding:0 24px;height:64px;display:flex;align-items:center;justify-content:space-between}
-.home-nav .brand{display:flex;align-items:center;gap:10px;font-weight:900;letter-spacing:-.02em}
-.home-nav .brand-icon{width:36px;height:36px;border-radius:10px;background:#0f172a;color:white;display:flex;align-items:center;justify-content:center;font-weight:900}
-.home-nav .links{display:flex;align-items:center;gap:20px}
-.home-nav .links a{font-size:14px;font-weight:600;color:#334155;text-decoration:none}
-.btn-black{background:#0f172a;color:white;padding:10px 16px;border-radius:999px;font-weight:700;font-size:13px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;border:1px solid #0f172a}
-.btn-white{background:white;border:1px solid #e2e8f0;padding:10px 16px;border-radius:999px;font-weight:700;font-size:13px;text-decoration:none;color:#0f172a;display:inline-flex;align-items:center;gap:6px}
-.hero2{max-width:1120px;margin:0 auto;padding:56px 24px 32px;display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center}
-@media(max-width:900px){.hero2{grid-template-columns:1fr;padding:32px 16px 24px}}
-.hero2 h1{font-size:clamp(36px,5vw,56px);line-height:.95;letter-spacing:-.05em;font-weight:950;margin-bottom:16px}
-.hero2 h1 span{color:#64748b;font-weight:800}
-.hero2 .sub{font-size:18px;line-height:1.6;color:#475569;max-width:520px;margin-bottom:24px}
-.cta-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:24px 0 18px}
-@media(max-width:600px){.cta-cards{grid-template-columns:1fr}}
-.cta-card{border:1px solid #e2e8f0;border-radius:20px;padding:20px;background:white;transition:.2s;cursor:pointer;text-decoration:none;color:inherit;display:block}
-.cta-card:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(15,23,42,.08);border-color:#0f172a}
-.cta-card.lost{background:#0f172a;color:white;border-color:#0f172a}
-.cta-card.lost small{color:#94a3b8}
-.cta-card h3{font-size:18px;font-weight:850;margin-bottom:6px;display:flex;align-items:center;gap:8px}
-.cta-card p{font-size:13px;line-height:1.5;color:#64748b}
-.cta-card.lost p{color:#cbd5e1}
-.trust-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
-.trust-chip{font-size:11px;font-weight:700;padding:6px 10px;border-radius:999px;background:#f1f5f9;border:1px solid #e2e8f0;color:#475569}
-.how{max-width:1120px;margin:24px auto;padding:32px 24px}
-.how-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:20px}
-@media(max-width:800px){.how-grid{grid-template-columns:1fr}}
-.step{background:white;border:1px solid #e2e8f0;border-radius:18px;padding:20px}
-.step-num{width:32px;height:32px;border-radius:999px;background:#0f172a;color:white;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;margin-bottom:12px}
-.step h4{font-size:15px;font-weight:800;margin-bottom:6px}
-.step p{font-size:13px;color:#64748b;line-height:1.6}
-.live-card{background:white;border:1px solid #e2e8f0;border-radius:22px;padding:16px;box-shadow:0 20px 60px rgba(15,23,42,.1)}
-.live-head{font-size:11px;font-weight:800;letter-spacing:.12em;color:#64748b;display:flex;align-items:center;gap:8px;margin-bottom:12px}
-.dot{width:8px;height:8px;border-radius:50%;background:#16a34a;box-shadow:0 0 0 4px #dcfce7;animation:pulse 1.8s infinite}
-@keyframes pulse{0%{box-shadow:0 0 0 4px #dcfce7}50%{box-shadow:0 0 0 7px #dcfce7}100%{box-shadow:0 0 0 4px #dcfce7}}
-.notif-list{display:flex;flex-direction:column;gap:8px;max-height:380px;overflow:auto}
-.notif-item{border:1px solid #f1f5f9;border-radius:14px;padding:12px;display:flex;gap:10px;align-items:flex-start}
-.notif-item.private{border-color:#bbf7d0;background:#f0fdf4}
-.notif-icon{width:36px;height:36px;border-radius:10px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.notif-item.private .notif-icon{background:#dcfce7}
-.notif-item h5{font-size:13px;font-weight:800;line-height:1.2;margin-bottom:4px}
-.notif-item p{font-size:12px;color:#64748b;line-height:1.5}
-.badge-new{background:#0f172a;color:white;font-size:10px;font-weight:800;padding:2px 6px;border-radius:999px}
-.empty{padding:28px;text-align:center;border:1px dashed #e2e8f0;border-radius:16px;background:#f8fafc}
-.empty p{font-size:13px;color:#64748b}
-.auth-pill{font-size:12px;padding:6px 10px;border-radius:999px;background:#f1f5f9;border:1px solid #e2e8f0;font-weight:700}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CampusFind AI | Lost Today. Found Today. - Gemini + Firebase Auth</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="public/css/style.css">
+    <style>
+     .auth-modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(6px);z-index:100;display:none;align-items:center;justify-content:center;padding:16px}
+     .auth-modal-overlay.open{display:flex}
+     .auth-modal{background:white;border-radius:20px;max-width:420px;width:100%;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.2);border:1px solid #e2e8f0}
+     .auth-tabs{display:flex;gap:8px;margin:12px 0 16px;background:#f1f5f9;padding:4px;border-radius:999px}
+     .auth-tab{flex:1;padding:8px 12px;border-radius:999px;border:1px solid transparent;background:transparent;font-weight:700;font-size:13px;cursor:pointer}
+     .auth-tab.active{background:white;border-color:#e2e8f0;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+     .auth-field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+     .auth-field label{font-size:12px;font-weight:700;color:#334155}
+     .auth-field input{padding:10px 12px;border:1px solid #e2e8f0;border-radius:12px;font-size:14px}
+     .auth-status{font-size:12px;padding:10px;border-radius:10px;margin:8px 0;display:none}
+     .auth-status.show{display:block}
+     .auth-status.ok{background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d}
+     .auth-status.err{background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
+     .auth-status.info{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af}
+     .user-pill{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;font-size:12px;font-weight:700}
+     .notif-tabs{display:flex;gap:8px;margin-bottom:12px}
+     .notif-tab{padding:6px 12px;border-radius:999px;border:1px solid #e2e8f0;background:white;font-size:12px;font-weight:700;cursor:pointer}
+     .notif-tab.active{background:#0f172a;color:white;border-color:#0f172a}
+    </style>
 </head>
-<body style="background:#f8fafc">
-<nav class="home-nav">
-  <div class="brand"><div class="brand-icon">CF</div> CampusFind</div>
-  <div class="links">
-    <a href="#how">How it works</a>
-    <a href="#notifications">Activity</a>
-    <span id="userArea"></span>
-    <button id="openAuthBtn" class="btn-black">Log in</button>
-  </div>
-</nav>
+<body>
+    <header class="navbar">
+        <div class="logo">
+            <div class="logo-icon">CF</div>
+            <div>
+                <h2>CampusFind <span>AI</span></h2>
+                <p>Smart Campus Recovery • Gemini + Firebase</p>
+            </div>
+        </div>
+        <nav>
+            <a href="#home">Home</a>
+            <a href="#how-it-works">How it works</a>
+            <a href="#features">Features</a>
+            <a href="#" id="notifBell" style="position:relative;">🔔 <span id="notifCount" style="display:none;position:absolute;top:-8px;right:-8px;background:#ef4444;color:white;border-radius:999px;padding:2px 6px;font-size:10px;font-weight:800;">0</span></a>
+            <span id="userNavArea"></span>
+            <button id="openAuthBtn" class="login-btn">Login / Sign up</button>
+        </nav>
+    </header>
 
-<section class="hero2">
-  <div>
-    <h1>Lost something<br>on campus?<br><span>We'll help you find possible matches.</span></h1>
-    <p class="sub">CampusFind is built for campus lost-and-found. Report what you lost or found in about 30 seconds — we compare reports and notify you if a possible match appears.</p>
-    
-    <div class="cta-cards">
-      <a href="lost.html" class="cta-card lost">
-        <h3>🔍 I lost something</h3>
-        <p>Report in 30 sec. Private to you. We'll check new found reports automatically.</p>
-        <small style="display:block;margin-top:12px;font-weight:700;">→ Report lost item</small>
-      </a>
-      <a href="found.html" class="cta-card">
-        <h3>📦 I found something</h3>
-        <p>Help a fellow student. Takes 30 sec. Owner gets notified privately if it matches.</p>
-        <small style="display:block;margin-top:12px;font-weight:700;color:#0f172a;">→ Report found item</small>
-      </a>
+    <section class="hero" id="home">
+        <div class="hero-content">
+            <div class="badge" id="aiBadge">🔍 Checking Gemini status via /api/status...</div>
+            <h1>Lost Today.<br><span>Found Today.</span></h1>
+            <p class="hero-text">Now with REAL Gemini AI + Firebase Auth: private lost reports linked to your verified UID, global notifications (no email exposed), owner-only match alerts.</p>
+            <div class="hero-buttons">
+                <a href="lost.html" class="primary-btn">🔍 Report lost item (private)</a>
+                <a href="found.html" class="secondary-btn">📦 Report found item</a>
+            </div>
+            <div class="trust"><span>✓ Firebase UID ownership</span><span>✓ Verified email only</span><span>✓ Real Gemini matching</span><span>✓ No email in public feed</span></div>
+            <div id="aiDetails" style="margin-top:16px;padding:12px;background:white;border:1px solid #e2e8f0;border-radius:12px;font-size:12px;color:#64748b;max-width:560px;"></div>
+            <div id="authInlineStatus" style="margin-top:12px;"></div>
+        </div>
+        <div class="hero-card" aria-hidden="true">
+            <div class="card-top"><span class="status-dot" id="statusDot"></span> <span id="liveText">LIVE GEMINI MATCHING • CHECKING...</span></div>
+            <div class="search-box">🔎 <span class="search-text">Scanning: "black Samsung phone crack bottom-right near library..."</span></div>
+            <div class="match-card">
+                <div class="item-image">📱</div>
+                <div class="item-info"><h3>Dark Samsung Smartphone</h3><p>Found • Library Desk • Crack lower-right</p><small>Gemini confidence 94% • embedding 0.91 • factors: item type, color, distinctive mark, location</small></div>
+                <div class="match-score"><strong>94%</strong><small>Gemini</small></div>
+            </div>
+            <div class="match-card second">
+                <div class="item-image">🎒</div>
+                <div class="item-info"><h3>Global Notification</h3><p>🔍 Someone reported lost • Keep an eye out</p><small>📦 A lost item has been found! • No GPS, campus-wide only • No email exposed</small></div>
+                <div class="match-score"><strong>🔔</strong><small>Global</small></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section" id="notificationsSection" style="background:var(--bg);">
+        <div class="section-heading">
+            <p class="section-label">NOTIFICATIONS • GLOBAL + PRIVATE OWNER • NO EMAIL EXPOSED</p>
+            <h2>Campus-wide + Your private matches</h2>
+            <p>Global: everyone sees generic lost/found. Private: only you (verified UID) see your match alerts. Email never in public notifications.</p>
+        </div>
+        <div class="match-results" id="notifRoot" style="max-width:860px;margin:0 auto;">
+            <div class="match-heading">
+                <div>
+                    <p class="section-label" id="notifEyebrow">FETCHING...</p>
+                    <h2 style="font-size:18px;">Notifications</h2>
+                    <p id="notifSubtitle" style="font-size:13px;color:var(--muted);">Loading from /api/notifications...</p>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                    <div class="notif-tabs">
+                        <button class="notif-tab active" data-filter="all">All</button>
+                        <button class="notif-tab" data-filter="global">Global</button>
+                        <button class="notif-tab" data-filter="private">My Matches 🔒</button>
+                    </div>
+                    <div class="count" id="notifCountLabel">0 notifications</div>
+                    <button id="markAllReadBtn" class="secondary-btn" style="padding:8px 12px;font-size:12px;">Mark all read</button>
+                </div>
+            </div>
+            <div id="myLostPreview" style="margin-bottom:16px;display:none;"></div>
+            <div id="notificationsList"></div>
+            <p class="demo-note">GET /api/notifications (auth optional) • GET /api/notifications/private (verified only) • POST /api/notifications/:id/read • SSE /api/notifications/stream</p>
+        </div>
+    </section>
+
+    <section class="section" id="how-it-works">
+        <div class="section-heading">
+            <p class="section-label">REAL GEMINI PIPELINE • FIREBASE UID OWNERSHIP</p>
+            <h2>Flow: verified login → private lost (UID) → global notif (no email) → Gemini → owner-only alert</h2>
+            <p>Backend verifies Firebase ID token, never trusts client ownerUid.</p>
+        </div>
+        <div class="steps">
+            <div class="step"><div class="step-number">01</div><div class="step-icon">🔐</div><h3>Firebase Auth + verify email</h3><p>Register with nickname/email/password. Nickname stored as displayName. Verification email sent via Firebase template. Must verify to create lost reports.</p></div>
+            <div class="step"><div class="step-number">02</div><div class="step-icon">🔒</div><h3>Private lost with UID</h3><p>POST /api/lost requires Bearer ID token. Backend verifies token, checks email_verified, sets ownerUid server-side. Report private.</p></div>
+            <div class="step"><div class="step-number">03</div><div class="step-icon">📦</div><h3>Found + global generic</h3><p>Found report public (no auth needed). Creates global notification without email/phone. Triggers Gemini matching against private lost.</p></div>
+            <div class="step"><div class="step-number">04</div><div class="step-icon">🎯</div><h3>Owner-only notification</h3><p>If Gemini ≥70%, backend creates notification with ownerUid = lost.ownerUid. Only that UID can fetch it via authenticated /api/notifications.</p></div>
+        </div>
+    </section>
+
+    <section class="features-section" id="features">
+        <div class="section-heading"><p class="section-label">BUILT FOR YOUR CAMPUS</p><h2>Privacy first, Gemini real, Auth real</h2><p>Same design, now with Firebase UID ownership and email verification.</p></div>
+        <div class="features-grid">
+            <div class="feature-card"><div class="feature-icon">🔒</div><h3>Private by design</h3><p>Lost reports private, only minimal public hint. Email never in public notifications or global feed.</p></div>
+            <div class="feature-card"><div class="feature-icon">🪪</div><h3>Firebase Auth real</h3><p>Real Email/Password, real emailVerified state, real ID token verification on backend via firebase-admin.</p></div>
+            <div class="feature-card"><div class="feature-icon">🧠</div><h3>Gemini untouched</h3><p>text-embedding-004 + gemini-1.5-flash pipeline preserved. No fake scores.</p></div>
+        </div>
+    </section>
+
+    <footer style="padding:28px clamp(20px,6.5%,96px);border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;background:white;">
+        <div><strong>CampusFind AI</strong> • Gemini + Firebase Auth • UID ownership • No GPS</div>
+        <div style="color:#64748b;font-size:12px;">Email never publicly displayed. Token verified server-side.</div>
+    </footer>
+
+    <div id="authModal" class="auth-modal-overlay">
+        <div class="auth-modal">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <h3 style="font-size:18px;">CampusFind Account</h3>
+                <button id="closeAuthBtn" style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;padding:6px 10px;cursor:pointer;">✕</button>
+            </div>
+            <p style="font-size:12px;color:#64748b;margin-top:4px;">Firebase Authentication • Email/Password • Verification required for lost reports</p>
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-tab="login">Login</button>
+                <button class="auth-tab" data-tab="register">Create account</button>
+            </div>
+            <div id="authStatus" class="auth-status"></div>
+            <form id="loginForm">
+                <div class="auth-field"><label>Email</label><input type="email" id="loginEmail" required placeholder="you@campus.edu"></div>
+                <div class="auth-field"><label>Password</label><input type="password" id="loginPassword" required placeholder="••••••••"></div>
+                <button type="submit" class="primary-btn" style="width:100%;margin-top:8px;">Login</button>
+                <div id="verifyArea" style="display:none;margin-top:12px;padding:10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;">
+                    <p style="font-size:12px;color:#9a3412;margin-bottom:8px;" id="verifyText">Please verify your email. Check inbox.</p>
+                    <button type="button" id="resendBtn" class="secondary-btn" style="width:100%;font-size:12px;">Resend verification email</button>
+                </div>
+            </form>
+            <form id="registerForm" style="display:none;">
+                <div class="auth-field"><label>Nickname (displayName)</label><input type="text" id="regNickname" required placeholder="Shau" maxlength="30"></div>
+                <div class="auth-field"><label>Email</label><input type="email" id="regEmail" required placeholder="you@campus.edu"></div>
+                <div class="auth-field"><label>Password (≥6 chars)</label><input type="password" id="regPassword" required placeholder="••••••••"></div>
+                <div class="auth-field"><label>Confirm password</label><input type="password" id="regConfirm" required placeholder="••••••••"></div>
+                <button type="submit" class="primary-btn" style="width:100%;margin-top:8px;">Create account & send verification</button>
+                <p style="font-size:11px;color:#64748b;margin-top:8px;">Verification email uses Firebase default template. After registering, check email to verify.</p>
+            </form>
+            <div id="accountArea" style="display:none;margin-top:16px;border-top:1px solid #e2e8f0;padding-top:12px;">
+                <div id="accountInfo" style="font-size:13px;"></div>
+                <button id="logoutBtn" class="secondary-btn" style="width:100%;margin-top:10px;">Logout</button>
+            </div>
+        </div>
     </div>
 
-    <div class="trust-row">
-      <span class="trust-chip">✓ Private lost reports — only you can see details</span>
-      <span class="trust-chip">✓ No email exposed in notifications</span>
-      <span class="trust-chip">✓ Owner-only match alerts</span>
-      <span class="trust-chip">✓ Built for campus</span>
-    </div>
-    <div id="myLostPreview" style="margin-top:18px;display:none"></div>
-  </div>
+    <script type="module">
+        import { getCurrentUser, getIdToken, register, login, logout, resendVerification, checkEmailVerified, onAuthChange, authFetch, getIdTokenForced } from "./public/js/auth.js";
 
-  <div class="live-card" id="notifCard">
-    <div class="live-head"><span class="dot"></span> LIVE CAMPUS ACTIVITY <span id="notifCount" class="badge-new" style="display:none">0 new</span></div>
-    <div style="display:flex;gap:8px;margin-bottom:12px;">
-      <button class="btn-black" style="padding:6px 10px;font-size:11px;" data-filter="all">All</button>
-      <button class="btn-white" style="padding:6px 10px;font-size:11px;" data-filter="global">Campus-wide</button>
-      <button class="btn-white" style="padding:6px 10px;font-size:11px;" data-filter="private">My matches 🔒</button>
-      <button id="markAllReadBtn" class="btn-white" style="margin-left:auto;padding:6px 10px;font-size:11px;">Mark read</button>
-    </div>
-    <div id="notifList" class="notif-list"><div class="empty"><p>Loading recent activity...</p></div></div>
-    <p style="font-size:11px;color:#94a3b8;margin-top:12px;text-align:center">🔔 Possible matches are only visible to the owner. We never share your contact publicly.</p>
-  </div>
-</section>
+        const modal = document.getElementById("authModal");
+        const openBtn = document.getElementById("openAuthBtn");
+        const closeBtn = document.getElementById("closeAuthBtn");
+        const loginForm = document.getElementById("loginForm");
+        const registerForm = document.getElementById("registerForm");
+        const authStatus = document.getElementById("authStatus");
+        const verifyArea = document.getElementById("verifyArea");
+        const verifyText = document.getElementById("verifyText");
+        const accountArea = document.getElementById("accountArea");
+        const accountInfo = document.getElementById("accountInfo");
+        const userNavArea = document.getElementById("userNavArea");
 
-<section class="how" id="how">
-  <p style="font-size:11px;font-weight:800;letter-spacing:.14em;color:#64748b;">HOW IT WORKS • SIMPLE, NOT TECHNICAL</p>
-  <h2 style="font-size:28px;font-weight:900;letter-spacing:-.03em;margin:8px 0 6px;">Report. Compare. Notify.</h2>
-  <p style="font-size:14px;color:#64748b;max-width:620px;">No complicated forms. We only ask what actually helps find a match.</p>
-  <div class="how-grid">
-    <div class="step"><div class="step-num">1</div><h4>Report what happened</h4><p>Lost: item, where, when, short description, optional photo. Found: same. Takes ~30 seconds.</p></div>
-    <div class="step"><div class="step-num">2</div><h4>We compare reports</h4><p>CampusFind compares your report with others using AI that looks at item type, description, location and time.</p></div>
-    <div class="step"><div class="step-num">3</div><h4>You get notified if possible match</h4><p>If we spot a likely match, the owner gets a private notification. No emails shown publicly.</p></div>
-  </div>
-  <div style="margin-top:28px;padding:16px;background:white;border:1px solid #e2e8f0;border-radius:14px;font-size:12px;color:#64748b;">
-    <strong style="color:#0f172a;">Privacy:</strong> Lost reports are private and linked to your account. Found reports create a generic campus alert like “A lost item has been found!” without revealing details. Possible matches are only visible to the owner.<br><br>
-    <strong style="color:#0f172a;">Honesty:</strong> We show <em>possible</em> matches, not guarantees. You decide if it's yours.
-  </div>
-</section>
+        function showStatus(msg, type="info") {
+            authStatus.textContent = msg;
+            authStatus.className = "auth-status show " + (type==="ok"?"ok":type==="err"?"err":"info");
+        }
+        function hideStatus(){ authStatus.className="auth-status"; }
 
-<div id="authModal" style="position:fixed;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(8px);z-index:100;display:none;align-items:center;justify-content:center;padding:16px;">
-  <div style="background:white;border-radius:20px;max-width:400px;width:100%;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.2)">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><h3 style="font-weight:900;">Welcome to CampusFind</h3><button id="closeAuthBtn" style="background:#f1f5f9;border:none;width:32px;height:32px;border-radius:999px;cursor:pointer;">✕</button></div>
-    <p style="font-size:12px;color:#64748b;margin-bottom:14px;">Your lost reports are private and owned by your account. Verified email required for reporting lost items.</p>
-    <div style="display:flex;gap:8px;background:#f1f5f9;padding:4px;border-radius:999px;margin-bottom:16px">
-      <button id="tabLogin" style="flex:1;padding:8px;border-radius:999px;border:1px solid #e2e8f0;background:white;font-weight:700;font-size:13px;">Log in</button>
-      <button id="tabSignup" style="flex:1;padding:8px;border-radius:999px;border:none;background:transparent;font-weight:700;font-size:13px;">Sign up</button>
-    </div>
-    <div id="authStatus" style="font-size:12px;padding:10px;border-radius:10px;margin-bottom:10px;display:none"></div>
-    <div style="display:flex;flex-direction:column;gap:10px">
-      <div id="nickField" style="display:none"><label style="font-size:11px;font-weight:700;">Nickname</label><input id="nickInput" placeholder="Alex" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;"></div>
-      <div><label style="font-size:11px;font-weight:700;">Email</label><input id="emailInput" type="email" placeholder="you@college.edu" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;"></div>
-      <div><label style="font-size:11px;font-weight:700;">Password</label><input id="passInput" type="password" placeholder="••••••••" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;"></div>
-      <div id="confirmField" style="display:none"><label style="font-size:11px;font-weight:700;">Confirm</label><input id="confirmInput" type="password" placeholder="••••••••" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;"></div>
-    </div>
-    <button id="authSubmit" style="width:100%;margin-top:14px;background:#0f172a;color:white;padding:12px;border-radius:12px;font-weight:700;border:none;cursor:pointer;">Continue</button>
-    <button id="resendBtn" style="width:100%;margin-top:8px;background:white;border:1px solid #e2e8f0;padding:10px;border-radius:12px;font-size:12px;font-weight:700;display:none;">Resend verification email</button>
-  </div>
-</div>
+        openBtn.addEventListener("click", ()=> modal.classList.add("open"));
+        closeBtn.addEventListener("click", ()=> modal.classList.remove("open"));
+        modal.addEventListener("click", (e)=>{ if(e.target===modal) modal.classList.remove("open"); });
 
-<footer style="max-width:1120px;margin:40px auto;padding:24px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;font-size:12px;color:#94a3b8">
-  <span>© CampusFind — possible matches, not guarantees.</span>
-  <span id="techBadge" style="font-size:11px;">Checking system...</span>
-</footer>
+        document.querySelectorAll(".auth-tab").forEach(tab=>{
+            tab.addEventListener("click", ()=>{
+                document.querySelectorAll(".auth-tab").forEach(t=>t.classList.remove("active"));
+                tab.classList.add("active");
+                hideStatus();
+                if(tab.dataset.tab==="login"){ loginForm.style.display="block"; registerForm.style.display="none"; }
+                else { loginForm.style.display="none"; registerForm.style.display="block"; }
+            });
+        });
 
-<script type="module">
-import { getCurrentUser, onAuthChange, authFetch, register, login, logout, resendVerification } from "./public/js/auth.js";
-const userArea=document.getElementById("userArea");const openBtn=document.getElementById("openAuthBtn");const modal=document.getElementById("authModal");const closeBtn=document.getElementById("closeAuthBtn");const tabLogin=document.getElementById("tabLogin");const tabSignup=document.getElementById("tabSignup");const nickField=document.getElementById("nickField");const confirmField=document.getElementById("confirmField");const nickInput=document.getElementById("nickInput");const emailInput=document.getElementById("emailInput");const passInput=document.getElementById("passInput");const confirmInput=document.getElementById("confirmInput");const authSubmit=document.getElementById("authSubmit");const authStatus=document.getElementById("authStatus");const resendBtn=document.getElementById("resendBtn");
-let mode="login";function setMode(m){mode=m;if(m==="login"){tabLogin.style.background="white";tabLogin.style.border="1px solid #e2e8f0";tabSignup.style.background="transparent";tabSignup.style.border="none";nickField.style.display="none";confirmField.style.display="none";authSubmit.textContent="Log in";}else{tabSignup.style.background="white";tabSignup.style.border="1px solid #e2e8f0";tabLogin.style.background="transparent";tabLogin.style.border="none";nickField.style.display="block";confirmField.style.display="block";authSubmit.textContent="Create account";}authStatus.style.display="none";}setMode("login");tabLogin.onclick=()=>setMode("login");tabSignup.onclick=()=>setMode("signup");openBtn.onclick=()=>modal.style.display="flex";closeBtn.onclick=()=>modal.style.display="none";modal.onclick=(e)=>{if(e.target===modal) modal.style.display="none";};
-function showStatus(msg,type="info"){authStatus.textContent=msg;authStatus.style.display="block";authStatus.style.background=type==="ok"?"#f0fdf4":type==="err"?"#fef2f2":"#eff6ff";authStatus.style.border="1px solid "+(type==="ok"?"#bbf7d0":type==="err"?"#fecaca":"#bfdbfe");authStatus.style.color=type==="ok"?"#15803d":type==="err"?"#991b1b":"#1e40af";}
-authSubmit.onclick=async()=>{authSubmit.disabled=true;authSubmit.textContent="Please wait...";try{if(mode==="signup"){await register({nickname:nickInput.value,email:emailInput.value,password:passInput.value,confirmPassword:confirmInput.value});showStatus("Account created! Check email for verification. Then log in.","ok");setMode("login");resendBtn.style.display="block";}else{const u=await login({email:emailInput.value,password:passInput.value});if(!u.emailVerified){showStatus("Logged in but email not verified. Check inbox or resend.","info");resendBtn.style.display="block";}else{showStatus("Logged in!","ok");setTimeout(()=>modal.style.display="none",600);}}}catch(e){showStatus(e.message,"err");}finally{authSubmit.disabled=false;authSubmit.textContent=mode==="signup"?"Create account":"Log in";}};
-resendBtn.onclick=async()=>{try{await resendVerification();showStatus("Verification email sent!","ok");}catch(e){showStatus(e.message,"err");}};
-function renderUser(){const u=getCurrentUser();if(u){userArea.innerHTML=`<span class="auth-pill">${u.displayName||u.email?.split('@')[0]} ${u.emailVerified?'✓':''}</span>`;openBtn.textContent="Log out";openBtn.onclick=async()=>{await logout();renderUser();loadMyLost();};if(u.emailVerified)resendBtn.style.display="none";else resendBtn.style.display="block";}else{userArea.innerHTML="";openBtn.textContent="Log in";openBtn.onclick=()=>modal.style.display="flex";}}onAuthChange(()=>{renderUser();loadNotifications();loadMyLost();});renderUser();
-async function loadMyLost(){const area=document.getElementById("myLostPreview");const u=getCurrentUser();if(!u||!u.emailVerified){area.style.display="none";return;}try{const r=await authFetch("/api/my-lost");const j=await r.json();if(j.count>0){area.style.display="block";area.innerHTML=`<div style="padding:12px;background:white;border:1px solid #bbf7d0;border-radius:12px;font-size:12px;"><strong>Your private reports (${j.count}):</strong> ${j.data.slice(0,2).map(i=>`${i.item} • ${new Date(i.createdAt).toLocaleDateString()}`).join(" • ")} <a href="#notifications" style="color:#0f172a;font-weight:700;">Check matches →</a></div>`;}else area.style.display="none";}catch{area.style.display="none";}}
-let currentFilter="all";document.querySelectorAll("[data-filter]").forEach(btn=>{btn.addEventListener("click",()=>{document.querySelectorAll("[data-filter]").forEach(b=>{b.className="btn-white";b.style.padding="6px 10px";b.style.fontSize="11px";});btn.className="btn-black";btn.style.padding="6px 10px";btn.style.fontSize="11px";currentFilter=btn.dataset.filter;renderNotifs(window._lastNotifs||[]);});});
-function renderNotifs(notifs){window._lastNotifs=notifs;const list=document.getElementById("notifList");const countEl=document.getElementById("notifCount");const unread=notifs.filter(n=>!n.read).length;countEl.style.display=unread>0?"inline-block":"none";countEl.textContent=unread+" new";let filtered=notifs;if(currentFilter==="global")filtered=notifs.filter(n=>!n.ownerUid);if(currentFilter==="private")filtered=notifs.filter(n=>n.ownerUid);if(filtered.length===0){list.innerHTML=`<div class="empty"><p>${currentFilter==="private"?"No private matches yet. When someone reports something similar to your lost item, you'll see it here.":"No campus activity yet. Be first to report."}</p></div>`;return;}list.innerHTML="";filtered.slice(0,20).forEach(n=>{const isPrivate=!!n.ownerUid;const div=document.createElement("div");div.className="notif-item"+(isPrivate?" private":"");const icon=n.type==="lost_report"?"🔍":n.type==="found_report"?"📦":n.type==="match_found"?"🎯":"🔔";const time=new Date(n.createdAt).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});let title=n.title;let msg=n.message;if(n.type==="found_report"){title="A lost item has been found on campus";msg="Someone reported a found item. If you lost something similar, check your private matches.";}if(n.type==="match_found"&&isPrivate){title="Possible match for your report";msg="Your report may have a match near campus. Tap to review.";}if(n.type==="lost_report"){title="Someone lost an item on campus";msg="Keep an eye out — a fellow student lost something nearby.";}div.innerHTML=`<div class="notif-icon">${icon}</div><div style="flex:1;min-width:0"><h5>${title} ${!n.read?'<span class="badge-new">NEW</span>':''} ${isPrivate?'🔒':''}</h5><p>${msg}</p><p style="font-size:10px;color:#94a3b8;margin-top:4px;">${time} • ${isPrivate?'Only you can see this':'Campus-wide'}</p></div>`;div.style.cursor="pointer";div.onclick=async()=>{if(!n.read){try{await authFetch("/api/notifications/"+n.id+"/read",{method:"POST"});}catch{}}if(n.type==="match_found"&&n.relatedFoundId){window.location.href="match.html?found="+n.relatedFoundId+"&lost="+(n.relatedLostId||"");}};list.appendChild(div);});}
-async function loadNotifications(){try{const res=await authFetch("/api/notifications");const json=await res.json();renderNotifs(json.data||[]);}catch(e){document.getElementById("notifList").innerHTML=`<div class="empty"><p>Unable to load activity.</p></div>`;}}document.getElementById("markAllReadBtn").onclick=async()=>{try{await authFetch("/api/notifications/read-all",{method:"POST"});loadNotifications();}catch{}};loadNotifications();setInterval(loadNotifications,15000);try{const es=new EventSource("/api/notifications/stream");es.onmessage=(ev)=>{try{const d=JSON.parse(ev.data);if(d.type&&d.type!=="connected")loadNotifications();}catch{}};}catch{}
-async function checkTech(){try{const r=await fetch("/api/status");const j=await r.json();document.getElementById("techBadge").textContent=`${j.storage.foundItems} found • ${j.storage.lostItems} private lost • ${j.ai.configured?"AI matching active":"Fallback active"}`;}catch{document.getElementById("techBadge").textContent="CampusFind";}}checkTech();
-</script>
+        loginForm.addEventListener("submit", async (e)=>{
+            e.preventDefault();
+            hideStatus();
+            const email = document.getElementById("loginEmail").value.trim();
+            const password = document.getElementById("loginPassword").value;
+            try{
+                const user = await login({ email, password });
+                if(!user.emailVerified){
+                    showStatus("Login successful but email not verified. Please verify. Check inbox.", "info");
+                    verifyArea.style.display="block";
+                    verifyText.textContent = `Email not verified for ${user.email}. Please verify via link sent to inbox.`;
+                } else {
+                    showStatus(`Welcome back, ${user.displayName||user.email}! Verified ✓`, "ok");
+                    verifyArea.style.display="none";
+                    setTimeout(()=> modal.classList.remove("open"), 800);
+                }
+                renderAuthState();
+                loadNotifications();
+            }catch(err){ showStatus(err.message, "err"); }
+        });
+
+        registerForm.addEventListener("submit", async (e)=>{
+            e.preventDefault();
+            hideStatus();
+            const nickname = document.getElementById("regNickname").value.trim();
+            const email = document.getElementById("regEmail").value.trim();
+            const password = document.getElementById("regPassword").value;
+            const confirmPassword = document.getElementById("regConfirm").value;
+            try{
+                const user = await register({ nickname, email, password, confirmPassword });
+                showStatus(`Account created for ${nickname}! Verification email sent to ${email}. Please verify before reporting lost items.`, "ok");
+                verifyArea.style.display="block";
+                verifyText.textContent = `Verification email sent to ${email}. Click link in email, then login.`;
+                document.querySelectorAll(".auth-tab").forEach(t=>t.classList.remove("active"));
+                document.querySelector('[data-tab="login"]').classList.add("active");
+                loginForm.style.display="block"; registerForm.style.display="none";
+                document.getElementById("loginEmail").value = email;
+            }catch(err){ showStatus(err.message, "err"); }
+        });
+
+        document.getElementById("resendBtn").addEventListener("click", async ()=>{
+            try{
+                await resendVerification();
+                showStatus("Verification email resent! Check inbox (and spam).", "ok");
+            }catch(err){ showStatus(err.message, "err"); }
+        });
+
+        document.getElementById("logoutBtn").addEventListener("click", async ()=>{
+            await logout();
+            showStatus("Logged out.", "info");
+            renderAuthState();
+            loadNotifications();
+        });
+
+        function renderAuthState(){
+            const user = getCurrentUser();
+            if(user){
+                openBtn.textContent = `${user.displayName||"Account"} ${user.emailVerified?"✓":"(unverified)"}`;
+                openBtn.style.background = user.emailVerified? "#0f172a" : "#f59e0b";
+                userNavArea.innerHTML = `<span class="user-pill">${user.displayName||"User"} • ${user.emailVerified?"Verified ✓":"Verify needed"}</span>`;
+                accountArea.style.display="block";
+                accountInfo.innerHTML = `<strong>Nickname:</strong> ${user.displayName||"-"}<br><strong>Email:</strong> ${user.email}<br><strong>Verified:</strong> ${user.emailVerified?"Yes ✓":"No - check inbox"}<br><strong>UID:</strong> <code style="font-size:10px;">${user.uid}</code>`;
+                if(!user.emailVerified) verifyArea.style.display="block";
+                else verifyArea.style.display="none";
+                document.getElementById("authInlineStatus").innerHTML = `<div class="user-pill">Logged in as ${user.displayName||user.email} • ${user.emailVerified?"Verified ✓ can report lost":"Unverified - verify email to report lost"} • <button id="inlineLogout" style="background:transparent;border:none;font-weight:800;cursor:pointer;">Logout</button></div>`;
+                document.getElementById("inlineLogout")?.addEventListener("click", async ()=>{ await logout(); renderAuthState(); loadNotifications(); });
+            } else {
+                openBtn.textContent = "Login / Sign up";
+                openBtn.style.background = "#0f172a";
+                userNavArea.innerHTML = "";
+                accountArea.style.display="none";
+                verifyArea.style.display="none";
+                document.getElementById("authInlineStatus").innerHTML = `<span style="font-size:12px;color:#64748b;">Not logged in • Login to see private match alerts and report private lost items (verified email required).</span>`;
+            }
+        }
+
+        onAuthChange(()=>{ renderAuthState(); loadNotifications(); loadMyLostPreview(); });
+
+        let currentFilter = "all";
+        document.querySelectorAll(".notif-tab").forEach(btn=>{
+            btn.addEventListener("click", ()=>{
+                document.querySelectorAll(".notif-tab").forEach(b=>b.classList.remove("active"));
+                btn.classList.add("active");
+                currentFilter = btn.dataset.filter;
+                loadNotifications();
+            });
+        });
+
+        async function loadNotifications(){
+            const list=document.getElementById("notificationsList");
+            const eyebrow=document.getElementById("notifEyebrow");
+            const subtitle=document.getElementById("notifSubtitle");
+            const countLabel=document.getElementById("notifCountLabel");
+            const bellCount=document.getElementById("notifCount");
+            try{
+                const res = await authFetch("/api/notifications");
+                const json=await res.json();
+                let notifs=json.data||[];
+                let display = notifs;
+                if(currentFilter==="global") display = notifs.filter(n=>!n.ownerUid);
+                if(currentFilter==="private") display = notifs.filter(n=>!!n.ownerUid);
+                eyebrow.textContent=`${json.isAuthenticated?`AUTHENTICATED as ${json.uid?.slice(0,6)} • `:"ANON • "}${display.length} SHOWING • ${notifs.length} TOTAL • ${json.filteredUnread||0} UNREAD • GLOBAL + PRIVATE FILTERED SERVER-SIDE`;
+                subtitle.textContent = json.isAuthenticated? `${json.filteredUnread||0} unread (global + your private)` : "Login to see your private match alerts";
+                countLabel.textContent=`${display.length} showing • ${json.count} total`;
+                if((json.filteredUnread||0)>0){ bellCount.style.display="inline"; bellCount.textContent=json.filteredUnread; } else { bellCount.style.display="none"; }
+                list.innerHTML="";
+                if(display.length===0){
+                    const empty=document.createElement("div"); empty.className="empty-state";
+                    empty.innerHTML=`<div class="icon">🔔</div><h3>No ${currentFilter==="private"?"private match":currentFilter==="global"?"global":""} notifications</h3><p>${currentFilter==="private"?"No strong Gemini matches yet for your verified account.":"Report a lost item (private, verified) or found item to create notifications. Email never exposed."}</p>`;
+                    list.appendChild(empty); return;
+                }
+                display.slice(0,30).forEach(n=>{
+                    const card=document.createElement("div"); card.className="result-card"+(n.read?"":" top-match"); card.style.cursor="pointer";
+                    const icon=document.createElement("div"); icon.className="result-icon";
+                    if(n.type==="lost_report") icon.textContent="🔍"; else if(n.type==="found_report") icon.textContent="📦"; else if(n.type==="match_found") icon.textContent="🎯"; else icon.textContent="🔔";
+                    const info=document.createElement("div"); info.className="result-info";
+                    const h3=document.createElement("h3"); h3.textContent=n.title + (n.ownerUid?" 🔒 private":" 🌐 global");
+                    const meta=document.createElement("div"); meta.className="meta";
+                    const typeSpan=document.createElement("span"); typeSpan.textContent=n.type + (n.ownerUid?" • owner-only":" • global");
+                    const dateSpan=document.createElement("span"); dateSpan.textContent=new Date(n.createdAt).toLocaleString();
+                    meta.appendChild(typeSpan); meta.appendChild(dateSpan);
+                    if(n.relatedLostId){ const s=document.createElement("span"); s.textContent=`LostID: ${n.relatedLostId}`; meta.appendChild(s); }
+                    if(n.relatedFoundId){ const s=document.createElement("span"); s.textContent=`FoundID: ${n.relatedFoundId}`; meta.appendChild(s); }
+                    const msg=document.createElement("small"); msg.textContent=n.message;
+                    info.appendChild(h3); info.appendChild(meta); info.appendChild(msg);
+                    const badge=document.createElement("div"); badge.className="match-score-result"+(n.read?" low":" high");
+                    const bStrong=document.createElement("strong"); bStrong.textContent=n.read?"READ":"NEW"; bStrong.style.fontSize="11px";
+                    const bSpan=document.createElement("span"); bSpan.textContent=n.read?"seen":"unread";
+                    badge.appendChild(bStrong); badge.appendChild(bSpan);
+                    card.addEventListener("click", async ()=>{
+                        if(!n.read){
+                            try{ await authFetch(`/api/notifications/${n.id}/read`,{method:"POST"}); loadNotifications(); }catch{}
+                        }
+                    });
+                    card.appendChild(icon); card.appendChild(info); card.appendChild(badge);
+                    list.appendChild(card);
+                });
+            }catch(e){ console.error(e); }
+        }
+
+        async function loadMyLostPreview(){
+            const area=document.getElementById("myLostPreview");
+            const user=getCurrentUser();
+            if(!user ||!user.emailVerified){ area.style.display="none"; return; }
+            try{
+                const res=await authFetch("/api/my-lost");
+                const json=await res.json();
+                if(json.count>0){
+                    area.style.display="block";
+                    area.innerHTML=`<div style="padding:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;font-size:12px;"><strong>Your private lost reports (${json.count}):</strong> ${json.data.slice(0,3).map(i=>`${i.item} (ID ${i.id})`).join(", ")} • Full data only visible to you.</div>`;
+                } else area.style.display="none";
+            }catch{ area.style.display="none"; }
+        }
+
+        document.getElementById("markAllReadBtn")?.addEventListener("click", async ()=>{
+            try{ await authFetch("/api/notifications/read-all",{method:"POST"}); loadNotifications(); }catch{}
+        });
+
+        async function checkAIStatus(){
+            const badge=document.getElementById("aiBadge");
+            const liveText=document.getElementById("liveText");
+            const dot=document.getElementById("statusDot");
+            const details=document.getElementById("aiDetails");
+            try{
+                const res=await fetch("/api/status");
+                const json=await res.json();
+                const ai=json.ai;
+                if(ai.configured){
+                    badge.textContent=`✦ ${ai.status} • Gemini • ${ai.embeddingModel} + ${ai.chatModel} • Firebase Admin ${json.auth.firebaseAdminConfigured?"✓":"not configured"}`;
+                    badge.style.background="#f0fdf4"; badge.style.border="1px solid #bbf7d0"; badge.style.color="#15803d";
+                    liveText.textContent=`LIVE GEMINI MATCHING • ${ai.embeddingModel} • found ${json.storage.foundItems} lost ${json.storage.lostItems} • Auth ${json.auth.firebaseAdminConfigured?"✓":"needs service account"}`;
+                    dot.style.background="#16a34a";
+                    details.innerHTML=`<strong>AI Provider:</strong> Gemini<br><strong>Embedding:</strong> ${ai.embeddingModel}<br><strong>Reasoning:</strong> ${ai.chatModel}<br><strong>Firebase Admin:</strong> ${json.auth.firebaseAdminConfigured?"Configured ✓":"NOT configured - set FIREBASE_SERVICE_ACCOUNT env var"}<br><strong>Found:</strong> ${json.storage.foundItems} <strong>Lost (private):</strong> ${json.storage.lostItems} <strong>Notifs:</strong> ${json.storage.notifications}`;
+                } else {
+                    badge.textContent=`⚠ ${ai.status} — Set GEMINI_API_KEY for real Gemini`;
+                    badge.style.background="#fff7ed"; badge.style.border="1px solid #fed7aa"; badge.style.color="#9a3412";
+                    liveText.textContent=`FALLBACK MATCHING • found ${json.storage.foundItems} lost ${json.storage.lostItems}`;
+                    dot.style.background="#ea580c";
+                    details.innerHTML=`<strong>AI Status:</strong> ${ai.status}<br><strong>Reason:</strong> ${ai.details}`;
+                }
+            }catch(e){
+                document.getElementById("aiBadge").textContent="Matching Service Offline — /api/status failed";
+            }
+        }
+        checkAIStatus();
+        loadNotifications();
+        try{
+            const evtSource = new EventSource("/api/notifications/stream");
+            evtSource.onmessage = (event)=>{
+                try{
+                    const notif = JSON.parse(event.data);
+                    if(notif.type && notif.type!=="connected"){
+                        loadNotifications();
+                    }
+                }catch{}
+            };
+        }catch(e){}
+        setInterval(loadNotifications, 15000);
+        setInterval(loadMyLostPreview, 15000);
+    </script>
 </body>
 </html>

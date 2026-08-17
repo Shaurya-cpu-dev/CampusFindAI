@@ -1,16 +1,16 @@
 {
   "name": "campusfindai",
-  "version": "3.0.0",
-  "description": "CampusFind AI - Fast trustworthy campus lost and found with real Gemini matching, private owner notifications, 10MB photo + camera",
+  "version": "2.0.0",
+  "description": "CampusFind AI with REAL Gemini matching + global notifications",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
     "campusfind",
     "gemini",
-    "lost-and-found",
-    "campus"
+    "lost-and-found"
   ],
   "author": "",
   "license": "ISC",

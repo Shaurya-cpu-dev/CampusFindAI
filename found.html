@@ -3,205 +3,127 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Report Found Item - CampusFind AI</title>
+    <title>Report Found Item - CampusFind AI Gemini + Owner Notify</title>
     <link rel="stylesheet" href="public/css/style.css">
 </head>
 <body>
     <header>
-        <h2>CampusFind AI</h2>
-        <a href="index.html">← Back Home</a>
+        <h2>CampusFind AI • Gemini • Found Report</h2>
+        <div style="display:flex;gap:12px;align-items:center;">
+            <span id="userPill"></span>
+            <a href="index.html">← Back Home</a>
+        </div>
     </header>
-
     <main class="lost-page">
         <div class="page-head">
-            <div class="eyebrow">STEP 1 OF 1 • FOUND REPORT</div>
+            <div class="eyebrow">FOUND REPORT • GLOBAL NOTIFICATION • GEMINI → OWNER UID NOTIFY</div>
             <h1>Report a found item</h1>
-            <p>Found something? Add a few details and a photo. It becomes instantly searchable for the owner via the shared backend.</p>
+            <p>Found something? Add details. Saved in <code>foundItems.json</code>. Creates global notification <em>"A lost item has been found!"</em> (no private data leak). Then Gemini matches against private lost reports (with ownerUid). If strong match (≥70%), owner gets private notification <em>only visible to that UID</em>. Email never exposed.</p>
+            <div style="margin-top:10px;padding:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;font-size:12px;color:#15803d;">📢 Global: Campus-wide only. No GPS, no geofencing. Owner notification is private, filtered server-side by UID.</div>
+            <div id="authInfo" style="margin-top:10px;padding:10px;background:white;border:1px solid #e2e8f0;border-radius:10px;font-size:12px;"></div>
         </div>
-
         <form class="lost-form" id="foundForm">
             <div class="form-grid">
                 <div class="field-group">
                     <label for="foundItem">What did you find? <span>*</span></label>
-                    <input type="text" id="foundItem" placeholder="Example: Black wallet with gold zip" required>
-                    <div class="hint">Include color + type. Helps matching: "black wallet" > "wallet"</div>
+                    <input type="text" id="foundItem" placeholder="Example: Dark black Samsung smartphone with crack lower-right" required>
                 </div>
-
                 <div class="field-row">
                     <div class="field-group">
                         <label for="foundLocation">Where did you find it? <span>*</span></label>
-                        <input type="text" id="foundLocation" placeholder="College library, 2nd floor" required>
+                        <input type="text" id="foundLocation" placeholder="beside a library desk" required>
                     </div>
                     <div class="field-group">
                         <label for="foundDate">When did you find it? <span>*</span></label>
                         <input type="date" id="foundDate" required>
                     </div>
                 </div>
-
                 <div class="field-group">
                     <label>What time did you find it? <span>*</span></label>
                     <div class="time-select-row">
-                        <select id="foundHour" required>
-                            <option value="">Hour</option>
-                            <option value="01">01</option><option value="02">02</option><option value="03">03</option>
-                            <option value="04">04</option><option value="05">05</option><option value="06">06</option>
-                            <option value="07">07</option><option value="08">08</option><option value="09">09</option>
-                            <option value="10">10</option><option value="11">11</option><option value="12">12</option>
-                        </select>
-                        <select id="foundMinute" required>
-                            <option value="">Minute</option>
-                            <option value="00">00</option><option value="05">05</option><option value="10">10</option>
-                            <option value="15">15</option><option value="20">20</option><option value="25">25</option>
-                            <option value="30">30</option><option value="35">35</option><option value="40">40</option>
-                            <option value="45">45</option><option value="50">50</option><option value="55">55</option>
-                        </select>
-                        <select id="foundAmPm" required>
-                            <option value="">AM / PM</option>
-                            <option value="AM">AM</option>
-                            <option value="PM">PM</option>
-                        </select>
+                        <select id="foundHour" required><option value="">Hour</option><option value="01">01</option><option value="02">02</option><option value="03">03</option><option value="04">04</option><option value="05">05</option><option value="06">06</option><option value="07">07</option><option value="08">08</option><option value="09">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option></select>
+                        <select id="foundMinute" required><option value="">Minute</option><option value="00">00</option><option value="05">05</option><option value="10">10</option><option value="15">15</option><option value="20">20</option><option value="25">25</option><option value="30">30</option><option value="35">35</option><option value="40">40</option><option value="45">45</option><option value="50">50</option><option value="55">55</option></select>
+                        <select id="foundAmPm" required><option value="">AM / PM</option><option value="AM">AM</option><option value="PM">PM</option></select>
                     </div>
                 </div>
-
                 <div class="field-group">
                     <label for="foundDescription">Describe the item <span>*</span></label>
-                    <textarea id="foundDescription" placeholder="Colour, brand, scratches, contents, any identifiable marks... The more specific, the faster the owner is found." required></textarea>
+                    <textarea id="foundDescription" placeholder="Dark black Samsung smartphone discovered beside a library desk. Screen has a noticeable crack around the lower-right area." required></textarea>
                 </div>
-
                 <div class="field-group">
-                    <label for="foundPhoto">Photo of the item <span style="color:#94a3b8">(optional but recommended)</span></label>
+                    <label for="foundPhoto">Photo (optional)</label>
                     <div class="upload-zone">
                         <input type="file" id="foundPhoto" accept="image/*">
-                        <div class="hint" style="margin-top:8px">JPG/PNG up to 2MB. We show a preview instantly. Saved as base64 to shared backend.</div>
+                        <div class="hint" style="margin-top:8px">JPG/PNG up to 2MB.</div>
                         <div id="previewContainer"></div>
                     </div>
                 </div>
-
-                <button type="submit" id="submitBtn">Report found item → Help owner find it</button>
-                <p class="hint" style="text-align:center" id="statusText">Saving to shared backend POST /api/found — survives restarts, shared across users.</p>
+                <button type="submit" id="submitBtn">Report found item → Global notification + Gemini matching (owner UID notify)</button>
+                <p class="hint" style="text-align:center" id="statusText">POST /api/found → saves found + global notification + async Gemini match → private owner notification if ≥70%.</p>
             </div>
         </form>
     </main>
 
-<script>
+<script type="module">
+    import { getCurrentUser, onAuthChange, authFetch } from "./public/js/auth.js";
+    function renderAuth(){
+        const user=getCurrentUser();
+        const info=document.getElementById("authInfo");
+        const pill=document.getElementById("userPill");
+        if(user){ info.innerHTML=`Logged in as <strong>${user.displayName||user.email}</strong> (${user.emailVerified?"Verified ✓":"Unverified"}) • UID ${user.uid.slice(0,8)}... • Found reports are public but your identity won't be exposed. Owner notification goes only to matched lost owner UID (≥70%).`; pill.innerHTML=`<span style="font-size:12px;background:#f0fdf4;padding:6px 10px;border-radius:999px;">${user.displayName||"User"}</span>`; }
+        else { info.innerHTML=`Not logged in • You can still report found items. Private owner notifications go to lost owners (UID-based, ≥70% only).`; pill.innerHTML=`<span style="font-size:12px;background:#f1f5f9;padding:6px 10px;border-radius:999px;">Guest</span>`; }
+    }
+    onAuthChange(renderAuth); renderAuth();
     document.getElementById("foundForm").addEventListener("submit", async (event) => {
         event.preventDefault();
-
-        const submitBtn = document.getElementById("submitBtn");
-        const statusText = document.getElementById("statusText");
-
-        const item = document.getElementById("foundItem").value.trim();
-        const location = document.getElementById("foundLocation").value.trim();
-        const date = document.getElementById("foundDate").value;
-        const foundHour = document.getElementById("foundHour").value;
-        const foundMinute = document.getElementById("foundMinute").value;
-        const foundAmPm = document.getElementById("foundAmPm").value;
-        const description = document.getElementById("foundDescription").value.trim();
-        let convertedHour = foundHour;
-
-        if (foundHour) {
-            let numericHour = parseInt(foundHour, 10);
-            if (foundAmPm === "AM" && numericHour === 12) numericHour = 0;
-            if (foundAmPm === "PM" && numericHour !== 12) numericHour += 12;
-            convertedHour = String(numericHour).padStart(2, "0");
-        }
-
-        const foundDateTime = date && convertedHour && foundMinute && foundAmPm ? `${date}T${convertedHour}:${foundMinute}:00` : "";
-        const photoInput = document.getElementById("foundPhoto");
-        const file = photoInput.files[0];
-
-        const saveToBackend = async (photoData = "") => {
-            const newItem = {
-                id: Date.now(),
-                item,
-                location,
-                date,
-                dateTime: foundDateTime,
-                description,
-                photo: photoData
-            };
-
-            submitBtn.disabled = true;
-            submitBtn.textContent = "Saving...";
-            statusText.textContent = "Uploading to POST /api/found...";
-
-            try {
-                const response = await fetch("/api/found", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(newItem)
-                });
-
-                const result = await response.json();
-
-                if (!response.ok || !result.success) {
-                    throw new Error(result.message || "Failed to save report.");
+        const submitBtn=document.getElementById("submitBtn");
+        const statusText=document.getElementById("statusText");
+        const item=document.getElementById("foundItem").value.trim();
+        const location=document.getElementById("foundLocation").value.trim();
+        const date=document.getElementById("foundDate").value;
+        const foundHour=document.getElementById("foundHour").value;
+        const foundMinute=document.getElementById("foundMinute").value;
+        const foundAmPm=document.getElementById("foundAmPm").value;
+        const description=document.getElementById("foundDescription").value.trim();
+        let convertedHour=foundHour; if(foundHour){ let numericHour=parseInt(foundHour,10); if(foundAmPm==="AM"&&numericHour===12) numericHour=0; if(foundAmPm==="PM"&&numericHour!==12) numericHour+=12; convertedHour=String(numericHour).padStart(2,"0"); }
+        const foundDateTime=date&&convertedHour&&foundMinute&&foundAmPm?`${date}T${convertedHour}:${foundMinute}:00`:"";
+        const photoInput=document.getElementById("foundPhoto"); const file=photoInput.files[0];
+        const saveToBackend=async (photoData="")=>{
+            const newItem={ id:Date.now(), item, location, date, dateTime:foundDateTime, description, photo:photoData };
+            submitBtn.disabled=true; submitBtn.textContent="Saving & matching (≥70%)...";
+            try{
+                const response=await authFetch("/api/found",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(newItem)});
+                const result=await response.json(); if(!response.ok||!result.success) throw new Error(result.message||"Failed to save");
+                let container=document.getElementById("matchResultsContainer");
+                if(!container){
+                    container=document.createElement("div");
+                    container.id="matchResultsContainer";
+                    document.querySelector("main").appendChild(container);
                 }
-
-                alert(`Found item reported successfully!\n\nItem: ${item}\nLocation: ${location}\nSaved to shared backend.`);
-                document.getElementById("foundForm").reset();
-                document.querySelectorAll(".preview-wrap").forEach(el=>el.remove());
-                const existing = document.getElementById("photoPreview");
-                if(existing) existing.parentElement.remove();
-                statusText.textContent = "Saved! Now searchable via GET /api/found on any device.";
-
-            } catch (err) {
-                console.error("Save error:", err);
-                alert("Error saving report: " + err.message + "\n\nMake sure server is running at http://localhost:3000 and you opened via http://localhost:3000/found.html");
-                statusText.textContent = "Error: " + err.message;
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.textContent = "Report found item → Help owner find it";
-            }
+                let html=`<div style="margin:20px 0;padding:16px;background:#f0fdf4;border:2px solid #22c55e;border-radius:16px;"><h3 style="margin:0 0 8px;color:#15803d;">✅ Found item reported! ID: ${result.data.id}</h3><p style="font-size:13px;color:#334155;">Global notification created. Checking private lost reports for ≥70% matches...</p></div>`;
+                if(result.relevantMatches && result.relevantMatches.length>0){
+                    html+=`<div style="margin:20px 0;"><h2 style="font-size:20px;margin-bottom:12px;">🎯 Relevant Lost Matches (≥70%) — ${result.relevantMatches.length} found</h2><p style="font-size:13px;color:#64748b;margin-bottom:12px;">Owners have been notified privately. Only matched owners can see the notification.</p>`;
+                    result.relevantMatches.forEach(m=>{
+                        const l=m.lostItem;
+                        html+=`<div style="padding:14px;background:white;border:1px solid #bbf7d0;border-radius:12px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start;"><div style="font-size:24px;">🔍</div><div style="flex:1;"><strong>${l.item}</strong> — ${m.confidence}% match<br><small style="color:#64748b;">Lost @ ${l.location} on ${l.date} • Owner UID: ${l.ownerUid?.slice(0,8)}...</small><br><small style="color:#15803d;">Private notification sent to owner ✅</small></div><div style="background:#22c55e;color:white;padding:6px 10px;border-radius:999px;font-weight:800;font-size:12px;">${m.confidence}%</div></div>`;
+                    });
+                    html+=`</div>`;
+                } else {
+                    html+=`<div style="margin:20px 0;padding:14px;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;"><strong>No strong matches yet (≥70%).</strong><br><small>Found item saved. If a matching lost report comes later, owner will be notified automatically.</small></div>`;
+                }
+                container.innerHTML=html;
+                container.scrollIntoView({behavior:'smooth'});
+                document.getElementById("foundForm").reset(); document.querySelectorAll(".preview-wrap").forEach(el=>el.remove());
+            }catch(err){ alert("Error saving: "+err.message); statusText.textContent="Error: "+err.message; }
+            finally{ submitBtn.disabled=false; submitBtn.textContent="Report found item → Global notification + Gemini matching (≥70% owner notify)"; }
         };
-
-        if (file) {
-            if (file.size > 2 * 1024 * 1024) {
-                alert("Photo too large. Please choose an image under 2MB.");
-                return;
-            }
-            const reader = new FileReader();
-            reader.onload = (e) => saveToBackend(e.target.result);
-            reader.onerror = () => alert("Could not read photo file.");
-            reader.readAsDataURL(file);
-        } else {
-            await saveToBackend("");
-        }
+        if(file){ if(file.size>2*1024*1024){ alert("Photo too large. Max 2MB."); return; } const reader=new FileReader(); reader.onload=(e)=>saveToBackend(e.target.result); reader.readAsDataURL(file); } else await saveToBackend("");
     });
-
-/* PHOTO PREVIEW - preserved ID logic */
-document.getElementById("foundPhoto").addEventListener("change", function() {
-    const file = this.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        document.querySelectorAll(".preview-wrap").forEach(el=>el.remove());
-        document.getElementById("photoPreview")?.remove();
-
-        const wrap = document.createElement("div");
-        wrap.className = "preview-wrap";
-
-        const preview = document.createElement("img");
-        preview.id = "photoPreview";
-        preview.src = e.target.result;
-        preview.classList.add("photo-preview");
-
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "preview-remove";
-        btn.textContent = "✕ Remove";
-        btn.addEventListener("click", ()=>{
-            wrap.remove();
-            document.getElementById("foundPhoto").value = "";
-        });
-
-        wrap.appendChild(preview);
-        wrap.appendChild(btn);
-        document.getElementById("previewContainer").appendChild(wrap);
-    };
-    reader.readAsDataURL(file);
-});
+    document.getElementById("foundPhoto").addEventListener("change", function(){
+        const file=this.files[0]; if(!file) return; const reader=new FileReader();
+        reader.onload=(e)=>{ const wrap=document.createElement("div"); wrap.className="preview-wrap"; const preview=document.createElement("img"); preview.src=e.target.result; preview.classList.add("photo-preview"); const btn=document.createElement("button"); btn.type="button"; btn.className="preview-remove"; btn.textContent="✕ Remove"; btn.addEventListener("click",()=>{ wrap.remove(); document.getElementById("foundPhoto").value=""; }); wrap.appendChild(preview); wrap.appendChild(btn); document.getElementById("previewContainer").appendChild(wrap); }; reader.readAsDataURL(file);
+    });
 </script>
+
 </body>
 </html>

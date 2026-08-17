@@ -426,3 +426,19 @@ body:has(.lost-page){
   background: white;
   box-shadow: var(--shadow-sm);
 }
+
+
+/* Updates / Notifications - same design language */
+.updates-badge {
+  display:inline-flex;align-items:center;gap:6px;
+  background: var(--primary-soft); border:1px solid #dbeafe; color: var(--primary);
+  padding:6px 10px; border-radius:999px; font-size:11px; font-weight:800; letter-spacing:.06em;
+}
+.updates-badge.unread { background: #dcfce7; border-color:#bbf7d0; color:#15803d; }
+/* Real AI - upload + tags (added for new lost/found forms) */
+.upload-zone{border:2px dashed var(--border);padding:16px;border-radius:12px;background:var(--bg2);}
+.photo-preview{max-width:200px;border-radius:12px;border:1px solid var(--border);margin-top:8px;}
+.preview-remove{background:#fee2e2;color:#dc2626;border:1px solid #fecaca;padding:6px 10px;border-radius:999px;font-size:12px;cursor:pointer;margin-top:6px;}
+.preview-wrap{display:flex;flex-direction:column;gap:6px;align-items:flex-start;margin-top:10px;}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.tag{background:#eef2ff;color:#4f46e5;padding:4px 8px;border-radius:999px;font-size:10px;font-weight:700;border:1px solid #dbeafe;}

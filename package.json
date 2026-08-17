@@ -1,19 +1,25 @@
 {
   "name": "campusfindai",
-  "version": "1.0.0",
-  "description": "",
+  "version": "2.0.0",
+  "description": "CampusFind AI with REAL Gemini matching + global notifications",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": [
+    "campusfind",
+    "gemini",
+    "lost-and-found"
+  ],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@google/generative-ai": "^0.21.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "firebase-admin": "^12.7.0"
   }
 }

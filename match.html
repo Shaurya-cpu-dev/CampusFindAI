@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Possible Match — CampusFind</title><link rel="stylesheet" href="style.css">
+<style>
+body{background:#f8fafc}.topbar{position:sticky;top:0;background:white;border-bottom:1px solid #e2e8f0;padding:0 24px;height:60px;display:flex;align-items:center;justify-content:space-between;z-index:20}
+.wrap{max-width:960px;margin:24px auto;padding:0 16px 80px}
+.hero-match{text-align:center;padding:24px;background:white;border:1px solid #e2e8f0;border-radius:20px;margin-bottom:20px}
+.hero-match h1{font-size:28px;font-weight:900;letter-spacing:-.03em}
+.hero-match p{font-size:14px;color:#64748b;margin-top:8px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:800px){.grid2{grid-template-columns:1fr}}
+.item-card{background:white;border:1px solid #e2e8f0;border-radius:18px;padding:16px}
+.item-card.lost{border-color:#0f172a;border-width:2px}.item-card.found{border-color:#bbf7d0}
+.item-card h3{font-size:11px;font-weight:800;letter-spacing:.1em;color:#64748b;margin-bottom:10px}
+.item-card h2{font-size:18px;font-weight:900;margin-bottom:8px}
+.item-card img{width:100%;height:200px;object-fit:cover;border-radius:12px;background:#f1f5f9;margin-bottom:12px}
+.meta{font-size:12px;color:#475569;margin-bottom:4px}.meta strong{color:#0f172a}
+.why{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:16px;padding:16px;margin:16px 0}
+.why h4{font-size:11px;font-weight:800;letter-spacing:.12em;color:#14532d;margin-bottom:10px}
+.why div{font-size:13px;margin-bottom:6px;display:flex;gap:8px;align-items:flex-start}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px}
+.btn-yes{background:#0f172a;color:white;padding:14px;border-radius:12px;font-weight:800;border:none;cursor:pointer}
+.btn-no{background:white;border:1px solid #e2e8f0;padding:14px;border-radius:12px;font-weight:700;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="topbar"><a href="index.html" style="font-weight:900;text-decoration:none;color:#0f172a">← CampusFind</a><span style="font-size:12px;font-weight:700">Possible Match Review</span></div>
+<div class="wrap">
+<div class="hero-match"><h1 id="title">🔍 Possible match found</h1><p id="subtitle">Review carefully — this is a possible match, not a guarantee. Only you can confirm if it's yours.</p></div>
+<div id="content"><p style="text-align:center;padding:40px;color:#64748b">Loading match details...</p></div>
+</div>
+<script type="module">
+import { authFetch } from "./public/js/auth.js";
+const params=new URLSearchParams(location.search);
+const foundId=params.get("found");
+const lostId=params.get("lost");
+async function load(){
+  const content=document.getElementById("content");
+  try{
+    const res=await authFetch("/api/notifications");
+    const notifs=await res.json();
+    const matchNotif=notifs.data?.find(n=> (foundId && String(n.relatedFoundId)===String(foundId)) || (lostId && String(n.relatedLostId)===String(lostId)) ) || null;
+    let foundItem=null, lostItem=null;
+    if(foundId){
+      try{const fr=await fetch(`/api/found/${foundId}`);const fj=await fr.json();if(fj.data) foundItem=fj.data;}catch{}
+    }
+    if(lostId){
+      try{const lr=await authFetch(`/api/lost/${lostId}`);const lj=await lr.json();if(lj.data) lostItem=lj.data;}catch{}
+    }
+    if(!foundItem && !lostItem){
+      content.innerHTML=`<div style="padding:20px;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px"><p>Match details loading. Found ID: ${foundId} Lost ID: ${lostId}</p><p style="font-size:12px;color:#7c2d12;margin-top:8px">Session may have expired. Go to homepage → My Matches and click notification again.</p><a href="index.html" style="display:inline-block;margin-top:12px;background:#0f172a;color:white;padding:10px 16px;border-radius:999px;text-decoration:none;font-weight:700">Back to notifications</a></div>`;
+      return;
+    }
+    const lostHtml = lostItem ? `<div class="item-card lost"><h3>YOUR LOST REPORT 🔒 PRIVATE</h3><h2>${lostItem.item}</h2>${lostItem.photo?`<img src="${lostItem.photo}">`:`<div style="width:100%;height:200px;background:#f1f5f9;border-radius:12px;display:flex;align-items:center;justify-content:center">🔍 No photo</div>`}<div class="meta"><strong>Where:</strong> ${lostItem.location}</div><div class="meta"><strong>When:</strong> ${lostItem.date} ${lostItem.dateTime||''}</div><div class="meta"><strong>Description:</strong> ${lostItem.description||'No description'}</div><div class="meta" style="margin-top:8px;font-size:11px;color:#94a3b8">ID ${lostItem.id} • Private</div></div>` : `<div class="item-card lost"><h3>YOUR LOST REPORT</h3><p>Lost ID ${lostId} — log in to view private details.</p></div>`;
+    const foundHtml = foundItem ? `<div class="item-card found"><h3>POSSIBLE FOUND MATCH 📦</h3><h2>${foundItem.item}</h2>${foundItem.photo?`<img src="${foundItem.photo}">`:`<div style="width:100%;height:200px;background:#f1f5f9;border-radius:12px;display:flex;align-items:center;justify-content:center">📦 No photo</div>`}<div class="meta"><strong>Found where:</strong> ${foundItem.location}</div><div class="meta"><strong>Found when:</strong> ${foundItem.date}</div><div class="meta"><strong>Description:</strong> ${foundItem.description||''}</div></div>` : `<div class="item-card found"><h3>POSSIBLE FOUND MATCH</h3><p>Found ID ${foundId}</p></div>`;
+    const factors = matchNotif?.matchedFactors || ["Same/similar item type","Similar distinctive description","Similar location","Similar date/time"];
+    const confidence = matchNotif?.confidence || 75;
+    const strength = confidence>=85?"High":confidence>=70?"Medium":"Low";
+    content.innerHTML=`<div class="grid2">${lostHtml}${foundHtml}</div><div class="why"><h4>WHY WE THINK IT MAY MATCH</h4>${factors.map(f=>`<div>✓ ${f}</div>`).join("")}<div style="margin-top:12px;padding-top:12px;border-top:1px solid #bbf7d0;display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;font-weight:700">Match strength: <span style="background:#0f172a;color:white;padding:2px 8px;border-radius:999px">${strength}</span></span><span style="font-size:11px;color:#64748b">Possibility, not guarantee</span></div></div><div style="padding:16px;background:white;border:1px solid #e2e8f0;border-radius:16px"><h4 style="font-size:13px;font-weight:800;margin-bottom:8px">What next?</h4><p style="font-size:12px;color:#64748b;line-height:1.6">If this looks like your item, contact your campus lost-and-found office with Lost ID ${lostId||''} and Found ID ${foundId||''} to verify ownership. Do not share personal email publicly.</p><div class="actions"><button class="btn-yes" onclick="alert('Great! Contact campus lost-and-found with Lost ID ${lostId||''} and Found ID ${foundId||''}')">This looks like my item</button><button class="btn-no" onclick="location.href='index.html'">Not my item</button></div></div>`;
+  }catch(e){document.getElementById("content").innerHTML=`<div style="padding:20px;background:#fef2f2;border:1px solid #fecaca;border-radius:12px">Error: ${e.message}<br><a href="index.html">Back home</a></div>`;}
+}
+load();
+</script>
+</body>
+</html>

@@ -5,7 +5,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
-  onAuthStateChanged,
+  onIdTokenChanged,
   updateProfile,
   sendEmailVerification,
   reload
@@ -17,45 +17,78 @@ const auth = getAuth(app);
 
 let currentUser = null;
 let idToken = null;
-let listeners = [];
+let authStateResolved = false;
+const listeners = new Set();
 
 function notifyAuthListeners(user) {
-  listeners.forEach(cb => cb(user));
+  listeners.forEach(cb => {
+    try { cb(user); } catch (error) { console.error("Auth state listener failed", error); }
+  });
+  window.dispatchEvent(new CustomEvent("campusfind-auth-changed", { detail: { user } }));
 }
 
-async function refreshToken() {
-  if (!auth.currentUser) { idToken = null; return null; }
-  try {
-    idToken = await auth.currentUser.getIdToken(true);
-    return idToken;
-  } catch (e) {
-    console.error("Failed to refresh token", e);
+async function syncAuthState(user = auth.currentUser, forceRefresh = false) {
+  if (!user) {
+    currentUser = null;
+    idToken = null;
+    authStateResolved = true;
+    notifyAuthListeners(null);
     return null;
   }
+
+  try {
+    // Reload is important after the user returns from the email-verification link.
+    await reload(user);
+  } catch (e) {
+    console.warn("Could not reload Firebase user", e);
+  }
+
+  currentUser = auth.currentUser || user;
+  try {
+    idToken = await currentUser.getIdToken(forceRefresh);
+  } catch (e) {
+    idToken = null;
+    console.error("Failed to refresh Firebase ID token", e);
+  }
+  authStateResolved = true;
+  notifyAuthListeners(currentUser);
+  return currentUser;
 }
 
-onAuthStateChanged(auth, async (user) => {
-  currentUser = user;
-  if (user) {
-    try { await reload(user); } catch {}
-    idToken = await user.getIdToken();
-  } else {
-    idToken = null;
+// This fires for sign-in/sign-out and token refreshes, unlike onAuthStateChanged.
+onIdTokenChanged(auth, (user) => {
+  syncAuthState(user, false);
+});
+
+// Refresh verification status when the user comes back from the verification email.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && auth.currentUser) {
+    syncAuthState(auth.currentUser, true);
   }
-  notifyAuthListeners(user);
-  window.dispatchEvent(new CustomEvent("campusfind-auth-changed", { detail: { user } }));
 });
 
 export function onAuthChange(cb) {
-  listeners.push(cb);
-  if (currentUser!== undefined) cb(currentUser);
+  listeners.add(cb);
+  if (authStateResolved) cb(currentUser);
+  return () => listeners.delete(cb);
 }
 export function getCurrentUser() { return currentUser; }
 export function getIdToken() { return idToken; }
 export async function getIdTokenForced() {
-  if (!auth.currentUser) return null;
-  idToken = await auth.currentUser.getIdToken(true);
-  return idToken;
+  if (!auth.currentUser) {
+    idToken = null;
+    return null;
+  }
+  try {
+    // Do not publish an auth-state event here: callers such as the notification
+    // loader use authFetch, and publishing would recursively re-trigger them.
+    idToken = await auth.currentUser.getIdToken(true);
+    return idToken;
+  } catch (error) {
+    idToken = null;
+    console.error("Failed to refresh Firebase ID token", error);
+    return null;
+  }
 }
 export function isLoggedIn() { return!!currentUser; }
 export function isVerified() { return!!currentUser?.emailVerified; }
@@ -71,23 +104,18 @@ export async function register({ nickname, email, password, confirmPassword }) {
   const cred = await createUserWithEmailAndPassword(auth, email, password);
   await updateProfile(cred.user, { displayName: nick });
   await sendEmailVerification(cred.user);
-  await refreshToken();
-  return cred.user;
+  return syncAuthState(cred.user, true);
 }
 
 export async function login({ email, password }) {
   if (!email ||!password) throw new Error("Email and password required.");
   const cred = await signInWithEmailAndPassword(auth, email, password);
-  await reload(cred.user);
-  await refreshToken();
-  return cred.user;
+  return syncAuthState(cred.user, true);
 }
 
 export async function logout() {
   await signOut(auth);
-  currentUser = null;
-  idToken = null;
-  notifyAuthListeners(null);
+  await syncAuthState(null);
 }
 
 export async function resendVerification() {
@@ -99,9 +127,8 @@ export async function resendVerification() {
 
 export async function checkEmailVerified() {
   if (!auth.currentUser) return false;
-  await reload(auth.currentUser);
-  await refreshToken();
-  return!!auth.currentUser.emailVerified;
+  const user = await syncAuthState(auth.currentUser, true);
+  return !!user?.emailVerified;
 }
 
 export async function authFetch(url, options = {}) {

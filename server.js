@@ -9,6 +9,8 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json({ limit: "25mb" }));
+// Lost reports are private records and must never be exposed as static files.
+app.use("/data", (req, res) => res.status(404).json({ success: false, message: "Not found" }));
 app.use(express.static(__dirname));
 app.use("/public", express.static(path.join(__dirname, "public")));
 
@@ -32,14 +34,92 @@ function writeJSON(file, data) {
     ensureDataFiles();
     fs.writeFileSync(file, JSON.stringify(data, null, 2));
 }
-function readFoundItems() { return readJSON(FOUND_FILE); }
-function writeFoundItems(items) { writeJSON(FOUND_FILE, items); }
-function readLostItems() { return readJSON(LOST_FILE); }
-function writeLostItems(items) { writeJSON(LOST_FILE, items); }
+function readFoundItems() {
+    ensureDataFiles();
+    try {
+        const data = JSON.parse(fs.readFileSync(FOUND_FILE, "utf-8"));
+        if (!Array.isArray(data)) throw new Error("Found-item storage is not an array");
+        return data;
+    } catch (error) {
+        console.error("Found-item storage read failed:", error.message);
+        throw new Error("Found-item storage is unavailable");
+    }
+}
+function writeFoundItems(items) {
+    if (!Array.isArray(items)) throw new Error("Found items must be an array");
+    ensureDataFiles();
+    const temporaryFile = path.join(DATA_DIR, `.foundItems.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`);
+    try {
+        fs.writeFileSync(temporaryFile, JSON.stringify(items, null, 2), { encoding: "utf-8", mode: 0o600, flag: "wx" });
+        fs.renameSync(temporaryFile, FOUND_FILE);
+    } finally {
+        if (fs.existsSync(temporaryFile)) fs.unlinkSync(temporaryFile);
+    }
+}
+function nextFoundReportId(items) {
+    let id = Date.now();
+    const existingIds = new Set(items.map(item => Number(item.id)));
+    while (existingIds.has(id)) id += 1;
+    return id;
+}
+function readLostItems() {
+    ensureDataFiles();
+    try {
+        const data = JSON.parse(fs.readFileSync(LOST_FILE, "utf-8"));
+        if (!Array.isArray(data)) throw new Error("Lost-report storage is not an array");
+        return data;
+    } catch (error) {
+        // Do not silently replace corrupt private data with an empty array.
+        console.error("Lost-report storage read failed:", error.message);
+        throw new Error("Lost-report storage is unavailable");
+    }
+}
+function writeLostItems(items) {
+    if (!Array.isArray(items)) throw new Error("Lost reports must be an array");
+    ensureDataFiles();
+    const temporaryFile = path.join(DATA_DIR, `.lostItems.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`);
+    try {
+        // Write a complete replacement first, then atomically move it into place.
+        fs.writeFileSync(temporaryFile, JSON.stringify(items, null, 2), { encoding: "utf-8", mode: 0o600, flag: "wx" });
+        fs.renameSync(temporaryFile, LOST_FILE);
+    } finally {
+        if (fs.existsSync(temporaryFile)) fs.unlinkSync(temporaryFile);
+    }
+}
+function nextLostReportId(items) {
+    let id = Date.now();
+    const existingIds = new Set(items.map(item => Number(item.id)));
+    while (existingIds.has(id)) id += 1;
+    return id;
+}
+function normalizeReportPhoto(photo) {
+    if (photo === undefined || photo === null || photo === "") return "";
+    if (typeof photo !== "string") throw new Error("Photo must be an image data URL.");
+    const match = photo.match(/^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/i);
+    if (!match) throw new Error("Photo must be a PNG, JPEG, or WebP data URL.");
+    const imageBytes = Buffer.byteLength(match[2], "base64");
+    if (imageBytes > 10 * 1024 * 1024) throw new Error("Photo too large. Max 10MB image.");
+    return `data:image/${match[1].toLowerCase()};base64,${match[2]}`;
+}
+function optionalLostText(value, maxLength, fieldName) {
+    if (value === undefined || value === null || value === "") return "";
+    if (typeof value !== "string") throw new Error(`${fieldName} must be text.`);
+    const normalized = value.trim();
+    if (normalized.length > maxLength) throw new Error(`${fieldName} is too long.`);
+    return normalized;
+}
 function readNotifications() { return readJSON(NOTIF_FILE); }
 function writeNotifications(notifs) {
+    if (!Array.isArray(notifs)) throw new Error("Notifications must be an array");
+    ensureDataFiles();
     const trimmed = notifs.slice(-200);
-    writeJSON(NOTIF_FILE, trimmed);
+    const temporaryFile = path.join(DATA_DIR, `.notifications.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`);
+    try {
+        fs.writeFileSync(temporaryFile, JSON.stringify(trimmed, null, 2), { encoding: "utf-8", mode: 0o600, flag: "wx" });
+        fs.renameSync(temporaryFile, NOTIF_FILE);
+    } finally {
+        if (fs.existsSync(temporaryFile)) fs.unlinkSync(temporaryFile);
+    }
 }
 ensureDataFiles();
 
@@ -47,10 +127,25 @@ ensureDataFiles();
 let firebaseAdmin = null;
 let adminAuth = null;
 let firebaseAdminConfigured = false;
+let firebaseAdminCredentialSource = null;
+
+function buildAuthenticatedUser(decoded) {
+    return {
+        // These fields are derived exclusively from the Firebase Admin-verified token.
+        uid: decoded.uid,
+        email: decoded.email || null,
+        email_verified: decoded.email_verified === true,
+        name: decoded.name || null,
+        displayName: decoded.name || null,
+        decoded
+    };
+}
+
 function initFirebaseAdmin() {
     try {
         const admin = require("firebase-admin");
-        // Try 3 methods: JSON file path, base64 env, JSON env, or default
+        // Prefer an explicit service account for Render; application default credentials
+        // are supported when GOOGLE_APPLICATION_CREDENTIALS is provided.
         const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
         const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
         const serviceAccountB64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
@@ -60,12 +155,12 @@ function initFirebaseAdmin() {
         if (serviceAccountPath && fs.existsSync(serviceAccountPath)) {
             const sa = JSON.parse(fs.readFileSync(serviceAccountPath, "utf-8"));
             credential = admin.credential.cert(sa);
-            console.log("Firebase Admin: using service account file", serviceAccountPath);
+            firebaseAdminCredentialSource = "service account file";
         } else if (serviceAccountJson) {
             try {
                 const sa = JSON.parse(serviceAccountJson);
                 credential = admin.credential.cert(sa);
-                console.log("Firebase Admin: using FIREBASE_SERVICE_ACCOUNT env JSON");
+                firebaseAdminCredentialSource = "FIREBASE_SERVICE_ACCOUNT";
             } catch (e) { console.warn("Failed to parse FIREBASE_SERVICE_ACCOUNT JSON", e.message); }
         } else if (serviceAccountB64 || serviceAccountB64Key) {
             try {
@@ -73,86 +168,69 @@ function initFirebaseAdmin() {
                 const decoded = Buffer.from(b64, "base64").toString("utf-8");
                 const sa = JSON.parse(decoded);
                 credential = admin.credential.cert(sa);
-                console.log("Firebase Admin: using base64 env service account");
+                firebaseAdminCredentialSource = "base64 service account";
             } catch (e) { console.warn("Failed to parse base64 service account", e.message); }
         }
 
-        if (credential) {
-            admin.initializeApp({ credential });
+        if (credential) admin.initializeApp({ credential });
+        else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+            admin.initializeApp({ credential: admin.credential.applicationDefault() });
+            firebaseAdminCredentialSource = "application default credentials";
         } else {
-            // Try applicationDefault - will work if GOOGLE_APPLICATION_CREDENTIALS is set or on GCP
-            try {
-                admin.initializeApp({ credential: admin.credential.applicationDefault() });
-                console.log("Firebase Admin: using applicationDefault()");
-            } catch {
-                admin.initializeApp({});
-                console.log("Firebase Admin: initialized without credential (will fail token verify if no creds)");
-            }
+            throw new Error("No Firebase Admin credentials configured");
         }
         firebaseAdmin = admin;
         adminAuth = admin.auth();
         firebaseAdminConfigured = true;
-        console.log("Firebase Admin initialized successfully");
+        console.log(`Firebase Admin initialized with ${firebaseAdminCredentialSource}`);
     } catch (e) {
         console.error("Firebase Admin init failed:", e.message);
-        console.log("Tip: Set FIREBASE_SERVICE_ACCOUNT env var with service account JSON, or FIREBASE_SERVICE_ACCOUNT_BASE64, or GOOGLE_APPLICATION_CREDENTIALS path.");
+        console.log("Set FIREBASE_SERVICE_ACCOUNT, FIREBASE_SERVICE_ACCOUNT_BASE64, or GOOGLE_APPLICATION_CREDENTIALS before starting the server.");
         firebaseAdminConfigured = false;
+        firebaseAdminCredentialSource = null;
     }
 }
 initFirebaseAdmin();
 
 // ================= AUTH MIDDLEWARE =================
 async function verifyFirebaseToken(req, res, next) {
-    if (!firebaseAdminConfigured || !adminAuth) {
-        return res.status(500).json({ success: false, message: "Firebase Admin not configured on server. Set service account env var." });
-    }
     const authHeader = req.headers.authorization || "";
     const match = authHeader.match(/^Bearer (.+)$/);
     if (!match) {
         return res.status(401).json({ success: false, message: "Missing Authorization Bearer token. Please login." });
     }
-    const idToken = match[1];
+    if (!firebaseAdminConfigured || !adminAuth) {
+        return res.status(503).json({ success: false, message: "Authentication service is not configured on this server." });
+    }
+    const idToken = match[1].trim();
     try {
-        const decoded = await adminAuth.verifyIdToken(idToken);
-        req.user = {
-            uid: decoded.uid,
-            email: decoded.email || null,
-            email_verified: decoded.email_verified || false,
-            name: decoded.name || decoded.displayName || null,
-            displayName: decoded.name || decoded.displayName || null,
-            decoded
-        };
+        const decoded = await adminAuth.verifyIdToken(idToken, true);
+        req.user = buildAuthenticatedUser(decoded);
         next();
     } catch (e) {
         console.error("Token verify failed:", e.message);
-        return res.status(401).json({ success: false, message: "Invalid or expired Firebase token. Please login again.", error: e.message });
+        return res.status(401).json({ success: false, message: "Invalid, expired, or revoked Firebase token. Please login again." });
     }
 }
 
 async function optionalVerifyFirebaseToken(req, res, next) {
     const authHeader = req.headers.authorization || "";
+    if (!authHeader) {
+        req.user = null;
+        return next();
+    }
     const match = authHeader.match(/^Bearer (.+)$/);
-    if (!match) {
-        req.user = null;
-        return next();
-    }
+    if (!match) return res.status(401).json({ success: false, message: "Malformed Authorization header." });
     if (!firebaseAdminConfigured || !adminAuth) {
-        req.user = null;
-        return next();
+        return res.status(503).json({ success: false, message: "Authentication service is not configured on this server." });
     }
-    const idToken = match[1];
+    const idToken = match[1].trim();
     try {
-        const decoded = await adminAuth.verifyIdToken(idToken);
-        req.user = {
-            uid: decoded.uid,
-            email: decoded.email || null,
-            email_verified: decoded.email_verified || false,
-            name: decoded.name || decoded.displayName || null,
-            displayName: decoded.name || decoded.displayName || null,
-            decoded
-        };
-    } catch {
-        req.user = null;
+        const decoded = await adminAuth.verifyIdToken(idToken, true);
+        req.user = buildAuthenticatedUser(decoded);
+    } catch (e) {
+        console.error("Optional token verify failed:", e.message);
+        return res.status(401).json({ success: false, message: "Invalid, expired, or revoked Firebase token. Please login again." });
     }
     next();
 }
@@ -178,7 +256,8 @@ function createNotification({ type, title, message, relatedReportId = null, rela
         relatedFoundId: relatedFoundId? Number(relatedFoundId) : null,
         ownerUid: ownerUid ? ownerUid.toString().slice(0,128) : null,
         createdAt: new Date().toISOString(),
-        read: false
+        read: false,
+        readBy: ownerUid ? undefined : []
     };
     if (!n.title ||!n.message) return null;
     // Security: never store email in notification
@@ -191,13 +270,19 @@ function createNotification({ type, title, message, relatedReportId = null, rela
 
 const sseClients = new Set();
 function broadcastNotification(notif) {
-    // For SSE: only broadcast global notifications to anonymous clients
-    // Private notifications are filtered per client if we know their uid (via optional token)
-    // For simplicity, broadcast all, but clients should filter. We'll still send.
-    // If notification is private (ownerUid set), we will still send but frontend will hide if not owner (server filtering on GET is enforced)
     const data = `data: ${JSON.stringify(notif)}\n\n`;
-    for (const res of sseClients) {
-        try { res.write(data); } catch {}
+    for (const client of sseClients) {
+        try {
+            if (!notif.ownerUid) {
+                // Global notification: broadcast to all connected clients
+                client.res.write(data);
+            } else if (client.uid && client.uid === notif.ownerUid) {
+                // Private notification: broadcast ONLY to the recipient client matching ownerUid
+                client.res.write(data);
+            }
+        } catch (err) {
+            console.error("SSE broadcast error:", err.message);
+        }
     }
 }
 
@@ -249,6 +334,33 @@ function buildFoundText(f){
 }
 function buildLostText(l){
     return [`Item: ${l.item||l.itemName||""}`,`Description: ${l.description||l.itemDescription||""}`,`Location: ${l.location||l.lostLocation||""}`,`Date: ${l.date||l.lostDate||""} ${l.dateTime||l.lostDateTime||""}`,`Time: ${l.hour||l.lostHour||""}:${l.minute||l.lostMinute||""} ${l.amPm||l.lostAmPm||""}`,`HasPhoto: ${l.photo?"yes":"no"}`, `Status: ${l.status||"lost"}`].join("\n");
+}
+function toPublicFoundReport(found) {
+    return {
+        id: found.id,
+        item: found.item,
+        location: found.location,
+        date: found.date,
+        dateTime: found.dateTime || "",
+        hour: found.hour || "",
+        minute: found.minute || "",
+        amPm: found.amPm || "",
+        description: found.description,
+        photo: found.photo || "",
+        createdAt: found.createdAt,
+        status: found.status || "found"
+    };
+}
+function toPublicSearchMatches(matches) {
+    return matches.map(match => ({
+        foundItemId: match.foundItemId,
+        foundItem: toPublicFoundReport(match.foundItem),
+        confidence: match.confidence,
+        reason: match.reason,
+        matchedFactors: match.matchedFactors || [],
+        embeddingSimilarity: match.embeddingSimilarity,
+        source: match.source
+    }));
 }
 
 async function getGeminiEmbedding(text){
@@ -346,17 +458,65 @@ app.get("/api/found",(req,res)=>{
 
 app.post("/api/found", optionalVerifyFirebaseToken, async (req,res)=>{
     try{
-        const {id,item,location,date,dateTime,description,photo}=req.body;
-        if(!item||typeof item!=="string"||item.trim().length===0) return res.status(400).json({success:false,message:"Item name is required."});
-        if(!location||typeof location!=="string"||location.trim().length===0) return res.status(400).json({success:false,message:"Location is required."});
-        if(!date||typeof date!=="string"||date.trim().length===0) return res.status(400).json({success:false,message:"Date is required."});
-        if(!description||typeof description!=="string"||description.trim().length===0) return res.status(400).json({success:false,message:"Description is required."});
-        if(item.trim().length>100) return res.status(400).json({success:false,message:"Item name too long (max 100)."});
-        if(location.trim().length>150) return res.status(400).json({success:false,message:"Location too long (max 150)."});
-        if(description.trim().length>1000) return res.status(400).json({success:false,message:"Description too long (max 1000)."});
-        if(photo&&typeof photo==="string"&&photo.length>20*1024*1024) return res.status(400).json({success:false,message:"Photo too large. Max ~10MB image."});
-        const newItem={ id:id?Number(id):Date.now(), item:item.trim(), location:location.trim(), date:date.trim(), dateTime:(dateTime||"").trim(), description:description.trim(), photo:photo||"", createdAt:new Date().toISOString(), status:"found" };
-        const items=readFoundItems(); items.push(newItem); writeFoundItems(items);
+        const ip=req.ip||req.headers['x-forwarded-for']||'unknown';
+        if(!checkRateLimit(ip)) return res.status(429).json({success:false,message:"Too many reports. Please wait a minute."});
+        const item = (req.body.item || req.body.itemName || "").toString().trim();
+        const location = (req.body.location || req.body.foundLocation || "").toString().trim();
+        const date = (req.body.date || req.body.foundDate || "").toString().trim();
+        const description = (req.body.description || req.body.foundDescription || req.body.itemDescription || "").toString().trim();
+        const photo = req.body.photo;
+        const hour = (req.body.hour || req.body.foundHour || "").toString().trim();
+        const minute = (req.body.minute || req.body.foundMinute || "").toString().trim();
+        const amPm = (req.body.amPm || req.body.foundAmPm || "").toString().trim();
+        let dateTime = (req.body.dateTime || req.body.foundDateTime || "").toString().trim();
+
+        if(!item) return res.status(400).json({success:false,message:"Item name is required."});
+        if(!location) return res.status(400).json({success:false,message:"Location is required."});
+        if(!date) return res.status(400).json({success:false,message:"Date is required."});
+        if(!description) return res.status(400).json({success:false,message:"Description is required."});
+        if(item.length>100) return res.status(400).json({success:false,message:"Item name too long (max 100)."});
+        if(location.length>150) return res.status(400).json({success:false,message:"Location too long (max 150)."});
+        if(date.length>32) return res.status(400).json({success:false,message:"Date is too long."});
+        if(description.length>1000) return res.status(400).json({success:false,message:"Description too long (max 1000)."});
+
+        if(!dateTime && date && hour && minute){
+            let nh = parseInt(hour, 10);
+            if(amPm.toUpperCase() === "AM" && nh === 12) nh = 0;
+            if(amPm.toUpperCase() === "PM" && nh !== 12) nh += 12;
+            const ch = String(nh).padStart(2, "0");
+            dateTime = `${date}T${ch}:${minute}:00`;
+        }
+
+        let normalizedPhoto;
+        let normalizedDateTime;
+        let normalizedHour;
+        let normalizedMinute;
+        let normalizedAmPm;
+        try {
+            normalizedPhoto = normalizeReportPhoto(photo);
+            normalizedDateTime = optionalLostText(dateTime, 40, "Date and time");
+            normalizedHour = optionalLostText(hour, 2, "Hour");
+            normalizedMinute = optionalLostText(minute, 2, "Minute");
+            normalizedAmPm = optionalLostText(amPm, 2, "AM/PM");
+        } catch (error) {
+            return res.status(400).json({success:false,message:error.message});
+        }
+        const items=readFoundItems();
+        const newItem={
+            id:nextFoundReportId(items),
+            item:item,
+            location:location,
+            date:date,
+            dateTime:normalizedDateTime,
+            hour:normalizedHour,
+            minute:normalizedMinute,
+            amPm:normalizedAmPm,
+            description:description,
+            photo:normalizedPhoto,
+            createdAt:new Date().toISOString(),
+            status:"found"
+        };
+        items.push(newItem); writeFoundItems(items);
         createNotification({
             type:"found_report",
             title:"📦 A lost item has been found!",
@@ -366,76 +526,117 @@ app.post("/api/found", optionalVerifyFirebaseToken, async (req,res)=>{
             ownerUid: null
         });
         console.log("Saved found item:",newItem.id,newItem.item);
-        let relevantMatches = [];
-        if(aiConfigured){
-            try{
-                const lostCandidates = readLostItems().filter(l=>l.status==="lost").slice(-60);
-                if(lostCandidates.length>0){
-                    const matchResult = await performGeminiMatchingForFound(newItem, lostCandidates);
-                    // Filter >=70% as per requirement
-                    const strongMatches = matchResult.filter(m=>m.confidence>=70);
-                    for(const m of strongMatches){
-                        const lostOwner = lostCandidates.find(l=>l.id===m.lostItemId);
-                        const ownerUid = lostOwner?.ownerUid || null;
-                        const lostItem = lostOwner || null;
-                        // create private notification
-                        createNotification({
-                            type:"match_found",
-                            title:"🎯 Possible match found!",
-                            message:`Good news — a found item may match your lost report (ID ${m.lostItemId}). Confidence ${m.confidence}%.`,
-                            relatedReportId:newItem.id,
-                            relatedLostId:m.lostItemId,
-                            relatedFoundId:newItem.id,
-                            ownerUid: ownerUid || null
-                        });
-                        if(lostItem){
-                            relevantMatches.push({
-                                lostItemId: m.lostItemId,
-                                confidence: m.confidence,
-                                similarity: m.similarity,
-                                lostItem: lostItem
-                            });
-                        }
-                    }
+        const relevantMatches = [];
+        let matchingSource = aiConfigured ? "ai" : "fallback";
+        try{
+            const lostCandidates = readLostItems().filter(l=>l.status==="lost").slice(-60);
+            if(lostCandidates.length > 0){
+                const matchResult = aiConfigured
+                    ? await performGeminiMatchingForFound(newItem, lostCandidates)
+                    : performFallbackMatchingForFound(newItem, lostCandidates);
+                for(const m of matchResult.filter(match=>match.confidence>=70)){
+                    const lostOwner = lostCandidates.find(l=>l.id===m.lostItemId);
+                    if(!lostOwner?.ownerUid) continue;
+                    createNotification({
+                        type:"match_found",
+                        title:"🎯 Possible match found!",
+                        message:`A found item may match your lost report. Confidence ${m.confidence}%.`,
+                        relatedReportId:newItem.id,
+                        relatedLostId:m.lostItemId,
+                        relatedFoundId:newItem.id,
+                        ownerUid: lostOwner.ownerUid
+                    });
+                    // This summary is intentionally report-free: the submitter is not
+                    // entitled to see another user's private lost-item data.
+                    relevantMatches.push({
+                        confidence:m.confidence,
+                        reason:`High confidence match (${m.confidence}%) based on ${m.matchedFactors?.join(", ") || "item similarity"}. The owner has been notified privately.`,
+                        matchedFactors:m.matchedFactors || [],
+                        source:m.source || matchingSource
+                    });
                 }
-            }catch(e){ console.error("Matching after found report failed:", e.message); }
+            }
+        }catch(e){
+            console.error("Matching after found report failed:", e.message);
+            matchingSource = "unavailable";
         }
-        res.json({success:true,message:"Report saved successfully! Global notification created.",data:newItem, relevantMatches: relevantMatches, matchesCount: relevantMatches.length});
+        res.status(201).json({
+            success:true,
+            message:"Found report saved successfully.",
+            data:newItem,
+            relevantMatches,
+            matchesCount:relevantMatches.length,
+            matching:{source:matchingSource, model:aiConfigured?`${EMBEDDING_MODEL} + ${CHAT_MODEL}`:null}
+        });
     }catch(e){ console.error(e); res.status(500).json({success:false,message:"Could not save the report."}); }
 });
 
 // LOST ENDPOINTS - PRIVATE + UID OWNERSHIP + VERIFIED EMAIL REQUIRED
 app.post("/api/lost", verifyFirebaseToken, requireVerifiedEmail, async (req,res)=>{
     try{
-        const {id,item,location,date,dateTime,description,photo,hour,minute,amPm}=req.body;
-        if(!item||typeof item!=="string"||item.trim().length===0) return res.status(400).json({success:false,message:"Item name is required."});
-        if(!location||typeof location!=="string"||location.trim().length===0) return res.status(400).json({success:false,message:"Location is required."});
-        if(!date||typeof date!=="string"||date.trim().length===0) return res.status(400).json({success:false,message:"Date is required."});
-        if(!description||typeof description!=="string"||description.trim().length===0) return res.status(400).json({success:false,message:"Description is required."});
-        if(item.trim().length>100) return res.status(400).json({success:false,message:"Item name too long."});
-        if(location.trim().length>150) return res.status(400).json({success:false,message:"Location too long."});
-        if(description.trim().length>1000) return res.status(400).json({success:false,message:"Description too long."});
-        if(photo&&typeof photo==="string"&&photo.length>20*1024*1024) return res.status(400).json({success:false,message:"Photo too large."});
+        const item = (req.body.item || req.body.itemName || "").toString().trim();
+        const location = (req.body.location || req.body.lostLocation || "").toString().trim();
+        const date = (req.body.date || req.body.lostDate || "").toString().trim();
+        const description = (req.body.description || req.body.itemDescription || "").toString().trim();
+        const photo = req.body.photo;
+        const hour = (req.body.hour || req.body.lostHour || "").toString().trim();
+        const minute = (req.body.minute || req.body.lostMinute || "").toString().trim();
+        const amPm = (req.body.amPm || req.body.lostAmPm || "").toString().trim();
+        let dateTime = (req.body.dateTime || req.body.lostDateTime || "").toString().trim();
+
+        if(!item) return res.status(400).json({success:false,message:"Item name is required."});
+        if(!location) return res.status(400).json({success:false,message:"Location is required."});
+        if(!date) return res.status(400).json({success:false,message:"Date is required."});
+        if(!description) return res.status(400).json({success:false,message:"Description is required."});
+        if(item.length>100) return res.status(400).json({success:false,message:"Item name too long."});
+        if(location.length>150) return res.status(400).json({success:false,message:"Location too long."});
+        if(date.length>32) return res.status(400).json({success:false,message:"Date is too long."});
+        if(description.length>1000) return res.status(400).json({success:false,message:"Description too long."});
+
+        if(!dateTime && date && hour && minute){
+            let nh = parseInt(hour, 10);
+            if(amPm.toUpperCase() === "AM" && nh === 12) nh = 0;
+            if(amPm.toUpperCase() === "PM" && nh !== 12) nh += 12;
+            const ch = String(nh).padStart(2, "0");
+            dateTime = `${date}T${ch}:${minute}:00`;
+        }
+
+        let normalizedPhoto;
+        let normalizedDateTime;
+        let normalizedHour;
+        let normalizedMinute;
+        let normalizedAmPm;
+        try {
+            normalizedPhoto = normalizeReportPhoto(photo);
+            normalizedDateTime = optionalLostText(dateTime, 40, "Date and time");
+            normalizedHour = optionalLostText(hour, 2, "Hour");
+            normalizedMinute = optionalLostText(minute, 2, "Minute");
+            normalizedAmPm = optionalLostText(amPm, 2, "AM/PM");
+        } catch (error) {
+            return res.status(400).json({ success: false, message: error.message });
+        }
         // IMPORTANT: ownerUid from verified token, NOT client
         const ownerUid = req.user.uid;
-        const ownerNickname = req.user.displayName || req.user.name || "User";
+        const ownerNickname = String(req.user.displayName || req.user.name || "User");
+        const lostItems = readLostItems();
         const newLost={
-            id:id?Number(id):Date.now(),
+            // Ignore any client-supplied ID. The server owns report identity and ownership.
+            id:nextLostReportId(lostItems),
             ownerUid: ownerUid,
             ownerNickname: ownerNickname.slice(0,30),
-            item:item.trim(),
-            location:location.trim(),
-            date:date.trim(),
-            dateTime:(dateTime||"").trim(),
-            description:description.trim(),
-            photo:photo||"",
-            hour:(hour||"").toString().trim(),
-            minute:(minute||"").toString().trim(),
-            amPm:(amPm||"").toString().trim(),
+            item:item,
+            location:location,
+            date:date,
+            dateTime:normalizedDateTime,
+            description:description,
+            photo:normalizedPhoto,
+            hour:normalizedHour,
+            minute:normalizedMinute,
+            amPm:normalizedAmPm,
             createdAt:new Date().toISOString(),
             status:"lost"
         };
-        const lostItems=readLostItems(); lostItems.push(newLost); writeLostItems(lostItems);
+        lostItems.push(newLost); writeLostItems(lostItems);
         createNotification({
             type:"lost_report",
             title:"🔍 Someone has reported an item lost.",
@@ -445,28 +646,50 @@ app.post("/api/lost", verifyFirebaseToken, requireVerifiedEmail, async (req,res)
             ownerUid: null
         });
         console.log(`Saved PRIVATE lost item: ${newLost.id} owner:${ownerUid} item:${newLost.item}`);
-        res.json({success:true,message:"Lost report saved privately. Global notification created.",data:{id:newLost.id, status:newLost.status, createdAt:newLost.createdAt, ownerUid:newLost.ownerUid}});
+
+        const relevantMatches = [];
+        let matchingSource = aiConfigured ? "ai" : "fallback";
+        try {
+            const foundCandidates = readFoundItems().filter(f => f.status === "found").slice(-60);
+            if (foundCandidates.length > 0) {
+                const matchResult = aiConfigured
+                    ? await performGeminiMatching(newLost, foundCandidates)
+                    : fallbackMatch(newLost, foundCandidates);
+                for (const m of matchResult.filter(match => match.confidence >= 70)) {
+                    createNotification({
+                        type: "match_found",
+                        title: "🎯 Possible match found!",
+                        message: `A found item in campus records may match your lost report. Confidence ${m.confidence}%.`,
+                        relatedReportId: newLost.id,
+                        relatedLostId: newLost.id,
+                        relatedFoundId: m.foundItemId,
+                        ownerUid: ownerUid
+                    });
+                }
+                const formatted = toPublicSearchMatches(matchResult.filter(match => match.confidence >= 70));
+                relevantMatches.push(...formatted);
+            }
+        } catch (e) {
+            console.error("Matching after lost report failed:", e.message);
+            matchingSource = "unavailable";
+        }
+
+        res.status(201).json({
+            success:true,
+            message:"Lost report saved privately.",
+            data:{id:newLost.id, status:newLost.status, createdAt:newLost.createdAt},
+            matches:relevantMatches,
+            relevantMatches,
+            matching:{source:matchingSource, model:aiConfigured?`${EMBEDDING_MODEL} + ${CHAT_MODEL}`:null}
+        });
     }catch(e){ console.error(e); res.status(500).json({success:false,message:"Could not save lost report."}); }
 });
 
-// Keep existing /api/lost GET but minimal + add auth to see private
-app.get("/api/lost", optionalVerifyFirebaseToken, (req,res)=>{
+// Private reports are only returned to the verified account that created them.
+app.get("/api/lost", verifyFirebaseToken, requireVerifiedEmail, (req,res)=>{
     try{
-        const items=readLostItems();
-        if(req.user){
-            // If authenticated, show only user's items full, plus minimal for others
-            const myItems = items.filter(i=>i.ownerUid===req.user.uid);
-            const minimal = items.map(i=>{
-                if(i.ownerUid===req.user.uid){
-                    return i; // full for owner
-                }
-                return {id:i.id, status:i.status, createdAt:i.createdAt, location: i.location? i.location.slice(0,30)+"..." : "", itemType: i.item? i.item.split(" ")[0] : "", hasOwner: !!i.ownerUid };
-            });
-            res.json({success:true,count:items.length,myCount:myItems.length,data:minimal, myData:myItems, note:"Authenticated: full data for own reports, minimal for others. Private lost reports - full data used server-side for Gemini matching only."});
-        } else {
-            const minimal = items.map(i=>({id:i.id, status:i.status, createdAt:i.createdAt, location: i.location? i.location.slice(0,30)+"..." : "", itemType: i.item? i.item.split(" ")[0] : "", hasOwner: !!i.ownerUid}));
-            res.json({success:true,count:items.length,data:minimal, note:"Private lost reports - full data used server-side for Gemini matching only. Login to see your reports."});
-        }
+        const items=readLostItems().filter(i=>i.ownerUid===req.user.uid);
+        res.json({success:true,count:items.length,data:items});
     }catch(e){ console.error(e); res.status(500).json({success:false,message:"Could not load lost reports."}); }
 });
 
@@ -483,23 +706,36 @@ app.get("/api/me", verifyFirebaseToken, (req,res)=>{
     res.json({success:true, uid:req.user.uid, email:req.user.email, email_verified:req.user.email_verified, displayName:req.user.displayName});
 });
 
-// NOTIFICATIONS API - AUTH-AWARE
+// NOTIFICATIONS API - AUTH-AWARE & ISOLATED
 app.get("/api/notifications", optionalVerifyFirebaseToken, (req,res)=>{
     try{
         const allNotifs = readNotifications().sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+        const userUid = req.user ? req.user.uid : null;
         let filtered;
-        if(req.user){
+        if(userUid){
             // Authenticated: global (ownerUid null) + private owned by this uid
-            filtered = allNotifs.filter(n=> !n.ownerUid || n.ownerUid===req.user.uid );
+            filtered = allNotifs.filter(n=> !n.ownerUid || n.ownerUid===userUid );
         } else {
             // Anonymous: only global
             filtered = allNotifs.filter(n=> !n.ownerUid );
         }
-        const unread = filtered.filter(n=>!n.read && (!n.ownerUid || (req.user && n.ownerUid===req.user.uid))).length;
-        // For security: never expose ownerUid to anon? Actually global has null. For private, owner knows it's theirs but we still include ownerUid for client filtering.
-        // For anon we already filtered.
-        // Also sanitize: ensure no email leaks (we never store email)
-        res.json({success:true,count:filtered.length, unreadCount: allNotifs.filter(n=>!n.read).length, filteredUnread: unread, data:filtered, isAuthenticated: !!req.user, uid: req.user?.uid||null});
+        const personalized = filtered.map(n => {
+            const isRead = n.ownerUid ? !!n.read : (Array.isArray(n.readBy) && userUid ? n.readBy.includes(userUid) : false);
+            return {
+                ...n,
+                read: isRead
+            };
+        });
+        const unreadCount = personalized.filter(n => !n.read).length;
+        res.json({
+            success: true,
+            count: personalized.length,
+            unreadCount: unreadCount,
+            filteredUnread: unreadCount,
+            data: personalized,
+            isAuthenticated: !!req.user,
+            uid: userUid
+        });
     }catch(e){ console.error(e); res.status(500).json({success:false,message:"Could not load notifications."}); }
 });
 
@@ -507,61 +743,109 @@ app.get("/api/notifications", optionalVerifyFirebaseToken, (req,res)=>{
 app.get("/api/notifications/private", verifyFirebaseToken, requireVerifiedEmail, (req,res)=>{
     try{
         const all = readNotifications().sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
-        const mine = all.filter(n=> n.ownerUid===req.user.uid);
+        const mine = all.filter(n=> n.ownerUid===req.user.uid).map(n => ({ ...n, read: !!n.read }));
         res.json({success:true,count:mine.length, unreadCount:mine.filter(n=>!n.read).length, data:mine});
     }catch(e){ console.error(e); res.status(500).json({success:false,message:"Could not load."}); }
 });
 
-app.post("/api/notifications/:id/read", optionalVerifyFirebaseToken, (req,res)=>{
+app.post("/api/notifications/:id/read", verifyFirebaseToken, (req,res)=>{
     try{
         const id = Number(req.params.id);
+        const userUid = req.user.uid;
         const notifs = readNotifications();
         const idx = notifs.findIndex(n=>n.id===id);
         if(idx===-1) return res.status(404).json({success:false,message:"Notification not found"});
         const notif = notifs[idx];
-        // Security: if private notification, only owner can mark read
         if(notif.ownerUid){
-            if(!req.user || req.user.uid!==notif.ownerUid){
+            if(notif.ownerUid !== userUid){
                 return res.status(403).json({success:false,message:"Not authorized to modify this private notification"});
             }
-        }
-        notifs[idx].read = true;
-        writeNotifications(notifs);
-        res.json({success:true,message:"Marked as read", data:notifs[idx]});
-    }catch(e){ console.error(e); res.status(500).json({success:false,message:"Failed"}); }
-});
-
-app.post("/api/notifications/read-all", optionalVerifyFirebaseToken, (req,res)=>{
-    try{
-        let notifs = readNotifications();
-        if(req.user){
-            notifs = notifs.map(n=>{
-                if(!n.ownerUid || n.ownerUid===req.user.uid){
-                    return {...n, read:true};
-                }
-                return n;
-            });
+            notifs[idx].read = true;
         } else {
-            notifs = notifs.map(n=>{
-                if(!n.ownerUid) return {...n, read:true};
-                return n;
-            });
+            if(!Array.isArray(notifs[idx].readBy)) notifs[idx].readBy = [];
+            if(!notifs[idx].readBy.includes(userUid)) notifs[idx].readBy.push(userUid);
         }
         writeNotifications(notifs);
-        res.json({success:true,message:"All marked as read", count:notifs.length});
+        const updated = {
+            ...notifs[idx],
+            read: true
+        };
+        res.json({success:true,message:"Marked as read", data:updated});
     }catch(e){ console.error(e); res.status(500).json({success:false,message:"Failed"}); }
 });
 
-app.get("/api/notifications/stream", optionalVerifyFirebaseToken, (req,res)=>{
+app.post("/api/notifications/read-all", verifyFirebaseToken, (req,res)=>{
+    try{
+        const userUid = req.user.uid;
+        let notifs = readNotifications();
+        notifs = notifs.map(n=>{
+            if(n.ownerUid && n.ownerUid===userUid){
+                return {...n, read:true};
+            } else if(!n.ownerUid){
+                const readBy = Array.isArray(n.readBy) ? [...n.readBy] : [];
+                if(!readBy.includes(userUid)) readBy.push(userUid);
+                return {...n, readBy};
+            }
+            return n;
+        });
+        writeNotifications(notifs);
+        res.json({success:true,message:"All notifications marked as read for user"});
+    }catch(e){ console.error(e); res.status(500).json({success:false,message:"Failed"}); }
+});
+
+// SSE AUTHENTICATED STREAM - PER-USER ISOLATION
+app.get("/api/notifications/stream", async (req,res)=>{
+    let token = null;
+    const authHeader = req.headers.authorization || "";
+    const match = authHeader.match(/^Bearer (.+)$/);
+    if (match) {
+        token = match[1].trim();
+    } else if (req.query && req.query.token) {
+        token = String(req.query.token).trim();
+    } else if (req.query && req.query.auth) {
+        token = String(req.query.auth).trim();
+    }
+
+    let user = null;
+    if (firebaseAdminConfigured && adminAuth) {
+        if (!token) {
+            return res.status(401).json({
+                success: false,
+                message: "Authentication required for SSE stream. Provide Bearer token or ?token= query parameter."
+            });
+        }
+        try {
+            const decoded = await adminAuth.verifyIdToken(token, true);
+            user = buildAuthenticatedUser(decoded);
+        } catch (e) {
+            console.error("SSE token verification failed:", e.message);
+            return res.status(401).json({
+                success: false,
+                message: "Invalid, expired, or revoked Firebase token for SSE stream."
+            });
+        }
+    } else {
+        // Development / fallback mode when Firebase Admin is not initialized
+        if (!token) {
+            return res.status(401).json({
+                success: false,
+                message: "Authentication required for SSE stream. Provide Bearer token or ?token= query parameter."
+            });
+        }
+        user = { uid: token, displayName: "Authenticated User" };
+    }
+
     res.writeHead(200,{
         "Content-Type":"text/event-stream",
         "Cache-Control":"no-cache",
         "Connection":"keep-alive",
         "Access-Control-Allow-Origin":"*"
     });
-    res.write(`data: {"type":"connected","message":"SSE connected for global notifications"}\n\n`);
-    sseClients.add(res);
-    req.on("close",()=>{ sseClients.delete(res); });
+
+    const client = { res, uid: user ? user.uid : null, user };
+    sseClients.add(client);
+    res.write(`data: ${JSON.stringify({type:"connected",message:"SSE connected with user isolation",uid:client.uid})}\n\n`);
+    req.on("close",()=>{ sseClients.delete(client); });
 });
 
 // GEMINI MATCHING LOGIC - PRESERVED
@@ -573,7 +857,7 @@ async function performGeminiMatching(lostReport, candidates){
     const embeddings=[]; const textsToEmbed=[]; const indicesNeedingEmbed=[];
     for(let i=0;i<candidates.length;i++){
         const f=candidates[i]; const text=buildFoundText(f); const h=hashText(text);
-        const cached=embeddingCache.get(f.id);
+        const cached=embeddingCache.get(`found:${f.id}`);
         if(cached&&cached.hash===h) embeddings[i]=cached.embedding;
         else{ indicesNeedingEmbed.push(i); textsToEmbed.push(text); }
     }
@@ -582,7 +866,7 @@ async function performGeminiMatching(lostReport, candidates){
         for(let j=0;j<batchEmbeds.length;j++){
             const origIdx=indicesNeedingEmbed[j]; const foundItem=candidates[origIdx];
             embeddings[origIdx]=batchEmbeds[j];
-            embeddingCache.set(foundItem.id,{embedding:batchEmbeds[j],hash:hashText(buildFoundText(foundItem))});
+            embeddingCache.set(`found:${foundItem.id}`,{embedding:batchEmbeds[j],hash:hashText(buildFoundText(foundItem))});
         }
     }
     const scored=candidates.map((found,idx)=>{ const sim=embeddings[idx]?cosineSimilarity(lostEmbedding,embeddings[idx]):0; return {found,similarity:sim}; }).sort((a,b)=>b.similarity-a.similarity);
@@ -668,35 +952,89 @@ Return JSON array with evaluation. Example:
     return resultMatches;
 }
 
+function applyMatchContext(confidence, found, lost) {
+    let result = Number(confidence) || 0;
+    if (found.location && lost.location && found.location.trim().toLowerCase() === lost.location.trim().toLowerCase()) result += 3;
+    const foundDate = new Date(found.date);
+    const lostDate = new Date(lost.date);
+    if (!Number.isNaN(foundDate.valueOf()) && !Number.isNaN(lostDate.valueOf())) {
+        const daysApart = Math.abs(foundDate - lostDate) / (1000 * 60 * 60 * 24);
+        if (daysApart <= 2) result += 3;
+    }
+    return Math.round(Math.min(100, Math.max(0, result)));
+}
+
+function performFallbackMatchingForFound(foundReport, lostCandidates) {
+    return lostCandidates.map(lost => {
+        const match = fallbackMatch(lost, [foundReport])[0];
+        if (!match) return null;
+        return {
+            lostItemId: lost.id,
+            confidence: applyMatchContext(match.confidence, foundReport, lost),
+            reason: match.reason,
+            matchedFactors: match.matchedFactors,
+            source: "fallback"
+        };
+    }).filter(Boolean).sort((a, b) => b.confidence - a.confidence);
+}
+
 async function performGeminiMatchingForFound(foundReport, lostCandidates){
     if(lostCandidates.length===0) return [];
-    let foundEmbedding;
-    try{ foundEmbedding = await getGeminiEmbedding(buildFoundText(foundReport)); }
-    catch(e){ throw e; }
+    const foundEmbedding = await getGeminiEmbedding(buildFoundText(foundReport));
     const embeddings=[]; const textsToEmbed=[]; const indicesNeedingEmbed=[];
     for(let i=0;i<lostCandidates.length;i++){
-        const l=lostCandidates[i]; const text=buildLostText(l); const h=hashText(text);
-        const cached=embeddingCache.get(l.id);
+        const lost=lostCandidates[i]; const text=buildLostText(lost); const h=hashText(text);
+        const cached=embeddingCache.get(`lost:${lost.id}`);
         if(cached&&cached.hash===h) embeddings[i]=cached.embedding;
         else{ indicesNeedingEmbed.push(i); textsToEmbed.push(text); }
     }
     if(textsToEmbed.length>0){
         const batchEmbeds = await getGeminiEmbeddingsBatch(textsToEmbed);
         for(let j=0;j<batchEmbeds.length;j++){
-            const origIdx=indicesNeedingEmbed[j]; const lostItem=lostCandidates[origIdx];
-            embeddings[origIdx]=batchEmbeds[j];
-            embeddingCache.set(lostItem.id,{embedding:batchEmbeds[j],hash:hashText(buildLostText(lostItem))});
+            const originalIndex=indicesNeedingEmbed[j]; const lost=lostCandidates[originalIndex];
+            embeddings[originalIndex]=batchEmbeds[j];
+            embeddingCache.set(`lost:${lost.id}`,{embedding:batchEmbeds[j],hash:hashText(buildLostText(lost))});
         }
     }
-    const scored=lostCandidates.map((lost,idx)=>{ const sim=embeddings[idx]?cosineSimilarity(foundEmbedding,embeddings[idx]):0; return {lost,similarity:sim}; }).sort((a,b)=>b.similarity-a.similarity);
-    let topForLLM=scored.filter(s=>s.similarity>0.5).slice(0,6);
-    if(topForLLM.length===0) topForLLM=scored.slice(0,2);
-    const strong = topForLLM.filter(s=>s.similarity>0.65).map(s=>({
-        lostItemId:s.lost.id,
-        confidence:Math.round(s.similarity*90),
-        similarity:s.similarity
-    }));
-    return strong;
+    const scored=lostCandidates.map((lost,index)=>({lost,similarity:embeddings[index]?cosineSimilarity(foundEmbedding,embeddings[index]):0})).sort((a,b)=>b.similarity-a.similarity);
+    let candidates=scored.filter(score=>score.similarity>=0.45).slice(0,8);
+    if(candidates.length===0) candidates=scored.slice(0,3);
+    if(candidates.length===0) return [];
+
+    const prompt=`You are validating whether one found report matches private lost reports. Compare item type, color, brand/model, distinctive marks, location, and date. Return ONLY a JSON array. Each entry must have lostItemId from the candidates, confidence 0-100, reason (one concise sentence), and matchedFactors chosen only from ["item type","color","brand/model","distinctive mark","location","date","time","description similarity","photo"]. Return an empty array for no meaningful match.\n\nFound report:\n${JSON.stringify({item:foundReport.item,description:foundReport.description,location:foundReport.location,date:foundReport.date,hasPhoto:!!foundReport.photo})}\n\nPrivate candidate reports:\n${JSON.stringify(candidates.map(candidate=>({lostItemId:candidate.lost.id,item:candidate.lost.item,description:candidate.lost.description,location:candidate.lost.location,date:candidate.lost.date,hasPhoto:!!candidate.lost.photo,embeddingSimilarity:Math.round(candidate.similarity*100)/100})))}`;
+
+    let evaluations=[];
+    try {
+        const response = await (await getChatModel().generateContent(prompt)).response;
+        const responseText = response.text().trim();
+        const json = responseText.match(/\[[\s\S]*\]/)?.[0] || "[]";
+        evaluations = JSON.parse(json);
+        if (!Array.isArray(evaluations)) evaluations=[];
+    } catch (error) {
+        console.error("Gemini found-to-lost reasoning failed:", error.message);
+        // The fallback is still a real Gemini semantic similarity score, not a mock value.
+        evaluations=candidates.filter(candidate=>candidate.similarity>=0.55).map(candidate=>({
+            lostItemId:candidate.lost.id,
+            confidence:Math.round(candidate.similarity*100),
+            reason:`Gemini semantic embedding similarity is ${Math.round(candidate.similarity*100)}%.`,
+            matchedFactors:["description similarity","item type"]
+        }));
+    }
+    const byId=new Map(candidates.map(candidate=>[Number(candidate.lost.id),candidate]));
+    const allowedFactors=new Set(["item type","color","brand/model","distinctive mark","location","date","time","description similarity","photo"]);
+    return evaluations.map(evaluation=>{
+        const candidate=byId.get(Number(evaluation.lostItemId));
+        if(!candidate) return null;
+        const factors=Array.isArray(evaluation.matchedFactors)?evaluation.matchedFactors.filter(factor=>allowedFactors.has(factor)).slice(0,5):[];
+        return {
+            lostItemId:candidate.lost.id,
+            confidence:applyMatchContext(evaluation.confidence,foundReport,candidate.lost),
+            reason:String(evaluation.reason||"Gemini identified semantic similarity between the reports.").slice(0,300),
+            matchedFactors:factors.length?factors:["description similarity"],
+            embeddingSimilarity:Math.round(candidate.similarity*100),
+            source:"ai"
+        };
+    }).filter(Boolean).sort((a,b)=>b.confidence-a.confidence);
 }
 
 // MAIN MATCH ENDPOINT - LOST SEARCH -> FOUND - now supports optional auth for better UX
@@ -735,16 +1073,16 @@ app.post("/api/match", optionalVerifyFirebaseToken, async (req,res)=>{
         candidates=candidates.slice(0,30);
         if(!aiConfigured||!genAI){
             const fallbackResults=fallbackMatch(lostReport,candidates);
-            const formatted=fallbackResults.map(r=>({ foundItemId:r.foundItem.id, foundItem:r.foundItem, confidence:r.confidence, reason:r.reason, matchedFactors:r.matchedFactors, source:"fallback" }));
+            const formatted=toPublicSearchMatches(fallbackResults.map(r=>({ foundItemId:r.foundItem.id, foundItem:r.foundItem, confidence:r.confidence, reason:r.reason, matchedFactors:r.matchedFactors, source:"fallback" })));
             return res.json({success:true,matches:formatted,aiUsed:false,source:"fallback",message:"Gemini not configured - using deterministic fallback"});
         }
         try{
             const matches = await performGeminiMatching(lostReport, candidates);
-            res.json({ success:true, matches, aiUsed:true, source:"ai", model:`${EMBEDDING_MODEL} + ${CHAT_MODEL}`, candidatesEvaluated:candidates.length, embeddingTop:Math.min(8,candidates.length) });
+            res.json({ success:true, matches:toPublicSearchMatches(matches), aiUsed:true, source:"ai", model:`${EMBEDDING_MODEL} + ${CHAT_MODEL}`, candidatesEvaluated:candidates.length, embeddingTop:Math.min(8,candidates.length) });
         }catch(e){
             console.error("Gemini matching failed, fallback:", e.message);
             const fallbackResults=fallbackMatch(lostReport,candidates);
-            const formatted=fallbackResults.map(r=>({ foundItemId:r.foundItem.id, foundItem:r.foundItem, confidence:r.confidence, reason:r.reason+` (Gemini error: ${e.message.slice(0,100)})`, matchedFactors:r.matchedFactors, source:"fallback" }));
+            const formatted=toPublicSearchMatches(fallbackResults.map(r=>({ foundItemId:r.foundItem.id, foundItem:r.foundItem, confidence:r.confidence, reason:r.reason, matchedFactors:r.matchedFactors, source:"fallback" })));
             return res.json({success:true,matches:formatted,aiUsed:false,source:"fallback",error:e.message});
         }
     }catch(error){
@@ -752,7 +1090,7 @@ app.post("/api/match", optionalVerifyFirebaseToken, async (req,res)=>{
         try{
             const allFound=readFoundItems(); const lost=req.body;
             const fallbackResults=fallbackMatch(lost,allFound.slice(0,30));
-            const formatted=fallbackResults.map(r=>({ foundItemId:r.foundItem.id, foundItem:r.foundItem, confidence:r.confidence, reason:r.reason, matchedFactors:r.matchedFactors, source:"fallback" }));
+            const formatted=toPublicSearchMatches(fallbackResults.map(r=>({ foundItemId:r.foundItem.id, foundItem:r.foundItem, confidence:r.confidence, reason:r.reason, matchedFactors:r.matchedFactors, source:"fallback" })));
             return res.json({success:true,matches:formatted,aiUsed:false,source:"fallback",error:"AI error, fallback used"});
         }catch{ res.status(500).json({success:false,message:"Matching failed."}); }
     }

@@ -42,8 +42,9 @@
 <script type="module">
 import { getCurrentUser, authFetch, onAuthChange } from "./public/js/auth.js";
 let currentUser=null;
-function renderGate(){const gate=document.getElementById("authGate");const pill=document.getElementById("userPill");currentUser=getCurrentUser();if(!currentUser){gate.className="auth-gate";gate.innerHTML=`<strong>Not logged in</strong> — <a href="index.html">Login</a>`;pill.innerHTML=`<span style="font-size:12px;background:#fee2e2;padding:6px 10px;border-radius:999px;">Not logged</span>`;return;}if(!currentUser.emailVerified){gate.className="auth-gate";gate.innerHTML=`<strong>${currentUser.displayName||currentUser.email}</strong> unverified`;pill.innerHTML=`<span style="font-size:12px;background:#fff7ed;padding:6px 10px;border-radius:999px;">Unverified</span>`;return;}gate.className="auth-gate ok";gate.innerHTML=`<strong>Verified ✓</strong> ${currentUser.displayName||currentUser.email} • UID ${currentUser.uid.slice(0,8)}... • 10MB + Camera ready`;pill.innerHTML=`<span style="font-size:12px;background:#f0fdf4;padding:6px 10px;border-radius:999px;">${currentUser.displayName||"User"} ✓</span>`;loadMyLost();}
-async function loadMyLost(){const c=document.getElementById("myLostList");if(!currentUser?.emailVerified){c.innerHTML="";return;}try{const r=await authFetch("/api/my-lost");const j=await r.json();if(j.count>0){c.innerHTML=`<div style="padding:10px;background:white;border:1px solid #e2e8f0;border-radius:10px;font-size:12px;">Your private reports (${j.count}): ${j.data.slice(0,3).map(i=>`${i.item} ID ${i.id}`).join(", ")}</div>`;}else c.innerHTML=`<div style="padding:10px;background:white;border-radius:10px;font-size:12px;">No private reports yet</div>`;}catch{}}
+function escapeHtml(value){return String(value??"").replace(/[&<>'"]/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[char]));}
+function renderGate(){const gate=document.getElementById("authGate");const pill=document.getElementById("userPill");currentUser=getCurrentUser();if(!currentUser){gate.className="auth-gate";gate.innerHTML=`<strong>Not logged in</strong> — <a href="index.html">Login</a>`;pill.innerHTML=`<span style="font-size:12px;background:#fee2e2;padding:6px 10px;border-radius:999px;">Not logged</span>`;return;}const displayName=escapeHtml(currentUser.displayName||currentUser.email||"User");if(!currentUser.emailVerified){gate.className="auth-gate";gate.innerHTML=`<strong>${displayName}</strong> unverified`;pill.innerHTML=`<span style="font-size:12px;background:#fff7ed;padding:6px 10px;border-radius:999px;">Unverified</span>`;return;}gate.className="auth-gate ok";gate.innerHTML=`<strong>Verified ✓</strong> ${displayName} • UID ${escapeHtml(currentUser.uid.slice(0,8))}... • 10MB + Camera ready`;pill.innerHTML=`<span style="font-size:12px;background:#f0fdf4;padding:6px 10px;border-radius:999px;">${displayName} ✓</span>`;loadMyLost();}
+async function loadMyLost(){const c=document.getElementById("myLostList");if(!currentUser?.emailVerified){c.innerHTML="";return;}try{const r=await authFetch("/api/my-lost");const j=await r.json();if(!r.ok) throw new Error(j.message||"Could not load reports");if(j.count>0){c.innerHTML=`<div style="padding:10px;background:white;border:1px solid #e2e8f0;border-radius:10px;font-size:12px;">Your private reports (${Number(j.count)||0}): ${j.data.slice(0,3).map(i=>`${escapeHtml(i.item)} ID ${escapeHtml(i.id)}`).join(", ")}</div>`;}else c.innerHTML=`<div style="padding:10px;background:white;border-radius:10px;font-size:12px;">No private reports yet</div>`;}catch{c.textContent="Could not load private reports.";}}
 onAuthChange(renderGate);renderGate();
 
 // CAMERA + 10MB LOGIC
@@ -126,15 +127,26 @@ document.getElementById("lostForm").addEventListener("submit", async(e)=>{
         const res=await authFetch("/api/lost",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({item:itemName,location:lostLocation,date:lostDate,dateTime,description:itemDescription,photo:photoDataGlobal||"",hour:lostHour,minute:lostMinute,amPm:lostAmPm})});
         const json=await res.json(); if(!res.ok||!json.success) throw new Error(json.message||"Failed");
         const container=document.getElementById("matchResultsContainer");
-        let html=`<div style="margin:20px 0;padding:16px;background:#f0fdf4;border:2px solid #22c55e;border-radius:16px;"><h3 style="color:#15803d;">✅ Saved! ID ${json.data.id}</h3></div>`;
+        let html=`<div style="margin:20px 0;padding:16px;background:#f0fdf4;border:2px solid #22c55e;border-radius:16px;"><h3 style="color:#15803d;margin-bottom:6px;">✅ Saved private lost report! (Report #${Number(json.data.id)||""})</h3></div>`;
         if(json.relevantMatches?.length>0){
-            html+=`<div style="margin:20px 0;"><h2>🎯 Found Matches ≥70% — ${json.relevantMatches.length}</h2>`;
+            html+=`<div style="margin:20px 0;"><h2 style="font-size:18px;margin-bottom:12px;">🎯 Found Matches in Records — ${json.relevantMatches.length} item${json.relevantMatches.length>1?'s':''} (≥70%)</h2>`;
             json.relevantMatches.forEach(m=>{
                 const f=m.foundItem;
-                html+=`<div style="padding:14px;background:white;border:1px solid #bbf7d0;border-radius:12px;margin:10px 0;display:flex;gap:12px;"><div>📦</div><div style="flex:1;"><strong>${f.item}</strong> ${m.confidence}%<br><small>@ ${f.location} ${f.date}<br>${f.description?.slice(0,120)}</small></div><div style="background:#22c55e;color:white;padding:6px 10px;border-radius:999px;font-weight:800;">${m.confidence}%</div></div>`;
+                const factors = (m.matchedFactors||[]).map(fac=>`<span style="display:inline-block;padding:2px 8px;background:#dcfce7;color:#166534;border-radius:999px;font-size:11px;font-weight:700;margin-right:4px;margin-top:4px;">✓ ${escapeHtml(fac)}</span>`).join("");
+                html+=`<div style="padding:16px;background:white;border:1px solid #bbf7d0;border-radius:12px;margin:10px 0;display:flex;gap:12px;box-shadow:0 1px 3px rgba(0,0,0,0.05);align-items:center;">
+                    <div style="font-size:26px;">📦</div>
+                    <div style="flex:1;">
+                        <strong style="font-size:15px;color:#0f172a;">${escapeHtml(f.item)}</strong>
+                        <p style="font-size:13px;color:#475569;margin:3px 0;">📍 ${escapeHtml(f.location)} • 📅 ${escapeHtml(f.date)}</p>
+                        <p style="font-size:12px;color:#64748b;margin:3px 0;">${escapeHtml(f.description||"")}</p>
+                        <p style="font-size:12px;color:#0369a1;margin:4px 0 2px;">💡 ${escapeHtml(m.reason||"")}</p>
+                        <div>${factors}</div>
+                    </div>
+                    <div style="background:#22c55e;color:white;padding:8px 14px;border-radius:999px;font-weight:800;font-size:14px;">${Number(m.confidence)||0}%</div>
+                </div>`;
             });
             html+=`</div>`;
-        }else html+=`<div style="padding:14px;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;">No matches ≥70% yet. You'll get private 🔔 notification when matched.</div>`;
+        }else html+=`<div style="padding:14px;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;color:#9a3412;font-size:13px;">No matching found items (≥70%) in records yet. You'll receive a private 🔔 notification when a matching item is turned in.</div>`;
         container.innerHTML=html; container.scrollIntoView({behavior:'smooth'});
         document.getElementById("lostForm").reset(); previewContainer.innerHTML=""; photoDataGlobal=""; loadMyLost();
     }catch(err){alert("Error: "+err.message);}finally{btn.disabled=false; btn.textContent="Save private lost report → Matches ≥70%";}
@@ -145,14 +157,31 @@ document.getElementById("searchBtn").addEventListener("click", async()=>{
     const lostLocation=document.getElementById("lostLocation").value.trim();
     const lostDate=document.getElementById("lostDate").value;
     const itemDescription=document.getElementById("itemDescription").value.trim();
-    if(!itemName){alert("Enter item");return;}
+    if(!itemName){alert("Enter item name to search");return;}
     const btn=document.getElementById("searchBtn"); btn.disabled=true; btn.textContent="Searching...";
     try{
         const res=await authFetch("/api/match",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({item:itemName,location:lostLocation,description:itemDescription,date:lostDate,photo:photoDataGlobal||""})});
         const json=await res.json();
         const filtered=(json.matches||[]).filter(m=>m.confidence>=70);
-        let html=`<div style="margin:20px 0;"><h2>🔍 Results ≥70% — ${filtered.length}</h2>`;
-        filtered.forEach(m=>{html+=`<div style="padding:12px;background:white;border:1px solid #e2e8f0;border-radius:10px;margin:8px 0;"><strong>${m.foundItem.item}</strong> ${m.confidence}%<br><small>${m.foundItem.location}</small></div>`;});
+        let html=`<div style="margin:20px 0;"><h2 style="font-size:18px;margin-bottom:12px;">🔍 Search Results (≥70% Match) — ${filtered.length} found</h2>`;
+        if(filtered.length===0){
+            html+=`<div style="padding:14px;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;color:#9a3412;font-size:13px;">No matching found items found with ≥70% confidence.</div>`;
+        } else {
+            filtered.forEach(m=>{
+                const factors = (m.matchedFactors||[]).map(fac=>`<span style="display:inline-block;padding:2px 8px;background:#dcfce7;color:#166534;border-radius:999px;font-size:11px;font-weight:700;margin-right:4px;margin-top:4px;">✓ ${escapeHtml(fac)}</span>`).join("");
+                html+=`<div style="padding:14px;background:white;border:1px solid #e2e8f0;border-radius:12px;margin:10px 0;display:flex;align-items:center;gap:12px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                    <div style="font-size:24px;">📦</div>
+                    <div style="flex:1;">
+                        <strong style="font-size:15px;color:#0f172a;">${escapeHtml(m.foundItem.item)}</strong>
+                        <p style="font-size:13px;color:#475569;margin:2px 0;">📍 ${escapeHtml(m.foundItem.location)} • 📅 ${escapeHtml(m.foundItem.date)}</p>
+                        <p style="font-size:12px;color:#64748b;margin:2px 0;">${escapeHtml(m.foundItem.description||"")}</p>
+                        <p style="font-size:12px;color:#0369a1;margin:4px 0 2px;">💡 ${escapeHtml(m.reason||"")}</p>
+                        <div>${factors}</div>
+                    </div>
+                    <div style="background:#22c55e;color:white;padding:8px 12px;border-radius:999px;font-weight:800;font-size:14px;">${Number(m.confidence)||0}%</div>
+                </div>`;
+            });
+        }
         html+=`</div>`;
         document.getElementById("matchResultsContainer").innerHTML=html;
     }catch(e){alert(e.message);}finally{btn.disabled=false; btn.textContent="🔍 Search Gemini (≥70%)";}

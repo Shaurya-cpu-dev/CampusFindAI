@@ -5,7 +5,7 @@ services:
     plan: free
     region: singapore
     branch: main
-    buildCommand: npm install
+    buildCommand: npm install && npm run build
     startCommand: npm start
     healthCheckPath: /api/status
     envVars:

@@ -11,8 +11,20 @@ app.use(cors());
 app.use(express.json({ limit: "25mb" }));
 // Lost reports are private records and must never be exposed as static files.
 app.use("/data", (req, res) => res.status(404).json({ success: false, message: "Not found" }));
-app.use(express.static(path.join(__dirname, "dist")));
-app.use(express.static(__dirname));
+const distDir = path.join(__dirname, "dist");
+const distIndex = path.join(distDir, "index.html");
+
+// Auto-build dist if missing
+if (!fs.existsSync(distIndex)) {
+    try {
+        console.log("[BUILD] dist/index.html not found on startup. Running vite build...");
+        require("child_process").execSync("npm run build", { stdio: "inherit", cwd: __dirname });
+    } catch (e) {
+        console.error("[BUILD] Automatic vite build failed:", e.message);
+    }
+}
+
+app.use(express.static(distDir, { index: "index.html" }));
 app.use("/public", express.static(path.join(__dirname, "public")));
 
 // DATA FILES
@@ -1161,10 +1173,9 @@ app.use((req, res, next) => {
     if (req.path.startsWith("/api") || req.path.startsWith("/data")) {
         return next();
     }
-    const distIndex = path.join(__dirname, "dist", "index.html");
     if (fs.existsSync(distIndex)) {
         return res.sendFile(distIndex);
     }
-    return res.sendFile(path.join(__dirname, "index.html"));
+    return res.status(503).send("CampusFind AI frontend is compiling. Please refresh in a moment.");
 });
 app.listen(PORT,()=>{ console.log(`CampusFind AI (Gemini + Firebase Auth) server running at http://localhost:${PORT}`); console.log(`Data: found=${readFoundItems().length} lost=${readLostItems().length} notifs=${readNotifications().length}`); console.log(`AI: ${aiConfigured?`Active Gemini (${EMBEDDING_MODEL} + ${CHAT_MODEL})`:"Fallback (no GEMINI_API_KEY)"}`); console.log(`Firebase Admin: ${firebaseAdminConfigured?"Configured":"NOT configured - set env vars"}`); });

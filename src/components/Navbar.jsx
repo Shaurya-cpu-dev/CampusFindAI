@@ -2,9 +2,13 @@ import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { Search, Terminal, Bell } from 'lucide-react';
 import AuthModal from './AuthModal.jsx';
+import NotificationDropdown from './NotificationDropdown.jsx';
+import { useNotifications } from '../context/NotificationContext.jsx';
 
 export default function Navbar({ user, onSearch, searchQuery = '' }) {
   const [authOpen, setAuthOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const { unreadCount } = useNotifications();
 
   return (
     <>
@@ -32,15 +36,34 @@ export default function Navbar({ user, onSearch, searchQuery = '' }) {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Live Notification Bar / Bell Button with real-time badge */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setNotifOpen(!notifOpen)}
+                className={"p-2 rounded-xl text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-all relative flex items-center justify-center " + (notifOpen ? "bg-gray-100 text-gray-900" : "")}
+                title="Notifications"
+                aria-label="View notifications"
+              >
+                <Bell className={"w-5 h-5 " + (unreadCount > 0 ? "text-primary animate-pulse" : "text-gray-600")} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 px-1.5 py-0.5 min-w-[18px] h-[18px] bg-primary text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-md animate-bounce">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </button>
+
+              <NotificationDropdown isOpen={notifOpen} onClose={() => setNotifOpen(false)} />
+            </div>
+
             <NavLink
               to="/matches"
               className={({ isActive }) =>
-                "px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all " +
+                "hidden sm:flex px-3.5 py-2 rounded-xl text-xs font-bold items-center gap-1.5 transition-all " +
                 (isActive ? "bg-gray-100 text-gray-900" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50")
               }
             >
-              <Bell className="w-4 h-4 text-primary" />
-              <span className="hidden sm:inline">My Matches</span>
+              <span>My Matches</span>
             </NavLink>
 
             <NavLink

@@ -112,12 +112,20 @@ export default function MyMatchesPage({ user }) {
                 <p className="text-xs text-gray-600 leading-relaxed">{notif.message}</p>
               </div>
 
-              <div className="shrink-0 flex items-center gap-2 w-full sm:w-auto">
+              <div className="shrink-0 flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+                {(notif.relatedFoundId || notif.relatedReportId) && (
+                  <Link
+                    to={`/chats?itemId=${notif.relatedFoundId || notif.relatedReportId}`}
+                    className="w-full sm:w-auto px-4 py-2 bg-primary hover:bg-[#ff4349] text-white text-xs font-bold rounded-xl text-center shadow-soft"
+                  >
+                    Chat / Handover
+                  </Link>
+                )}
                 <Link
                   to="/"
-                  className="w-full sm:w-auto px-4 py-2 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-xl text-center shadow-soft"
+                  className="w-full sm:w-auto px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-xl text-center"
                 >
-                  View in Feed
+                  View Feed
                 </Link>
               </div>
             </div>

@@ -10,6 +10,8 @@ import ReportFoundPage from './pages/ReportFoundPage.jsx';
 import MyMatchesPage from './pages/MyMatchesPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
 import DevPage from './pages/DevPage.jsx';
+import CommunityPage from './pages/CommunityPage.jsx';
+import ChatsPage from './pages/ChatsPage.jsx';
 import { onAuth } from './firebase/auth.js';
 import { NotificationProvider } from './context/NotificationContext.jsx';
 
@@ -34,6 +36,8 @@ export default function App() {
           <main>
             <Routes location={location} key={location.pathname}>
               <Route path="/" element={<HomePage searchQuery={searchQuery} onSearch={setSearchQuery} />} />
+              <Route path="/community" element={<CommunityPage user={user} />} />
+              <Route path="/chats" element={<ChatsPage user={user} />} />
               <Route path="/report/lost" element={<ReportLostPage user={user} />} />
               <Route path="/report/found" element={<ReportFoundPage />} />
               <Route path="/matches" element={<MyMatchesPage user={user} />} />

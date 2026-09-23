@@ -32,12 +32,16 @@ const DATA_DIR = path.join(__dirname, "data");
 const FOUND_FILE = path.join(DATA_DIR, "foundItems.json");
 const LOST_FILE = path.join(DATA_DIR, "lostItems.json");
 const NOTIF_FILE = path.join(DATA_DIR, "notifications.json");
+const COMMUNITY_FILE = path.join(DATA_DIR, "communityAlerts.json");
+const CHATS_FILE = path.join(DATA_DIR, "chats.json");
 
 function ensureDataFiles() {
     if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
     if (!fs.existsSync(FOUND_FILE)) fs.writeFileSync(FOUND_FILE, JSON.stringify([], null, 2));
     if (!fs.existsSync(LOST_FILE)) fs.writeFileSync(LOST_FILE, JSON.stringify([], null, 2));
     if (!fs.existsSync(NOTIF_FILE)) fs.writeFileSync(NOTIF_FILE, JSON.stringify([], null, 2));
+    if (!fs.existsSync(COMMUNITY_FILE)) fs.writeFileSync(COMMUNITY_FILE, JSON.stringify([], null, 2));
+    if (!fs.existsSync(CHATS_FILE)) fs.writeFileSync(CHATS_FILE, JSON.stringify([], null, 2));
 }
 function readJSON(file) {
     try { ensureDataFiles(); const raw = fs.readFileSync(file, "utf-8"); const data = JSON.parse(raw); return Array.isArray(data)? data : []; }
@@ -134,7 +138,72 @@ function writeNotifications(notifs) {
         if (fs.existsSync(temporaryFile)) fs.unlinkSync(temporaryFile);
     }
 }
+function readCommunityAlerts() { return readJSON(COMMUNITY_FILE); }
+function writeCommunityAlerts(alerts) {
+    if (!Array.isArray(alerts)) throw new Error("Community alerts must be an array");
+    ensureDataFiles();
+    const temporaryFile = path.join(DATA_DIR, `.community.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`);
+    try {
+        fs.writeFileSync(temporaryFile, JSON.stringify(alerts, null, 2), { encoding: "utf-8", mode: 0o600, flag: "wx" });
+        fs.renameSync(temporaryFile, COMMUNITY_FILE);
+    } finally {
+        if (fs.existsSync(temporaryFile)) fs.unlinkSync(temporaryFile);
+    }
+}
+
+function readChats() { return readJSON(CHATS_FILE); }
+function writeChats(chats) {
+    if (!Array.isArray(chats)) throw new Error("Chats must be an array");
+    ensureDataFiles();
+    const temporaryFile = path.join(DATA_DIR, `.chats.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`);
+    try {
+        fs.writeFileSync(temporaryFile, JSON.stringify(chats, null, 2), { encoding: "utf-8", mode: 0o600, flag: "wx" });
+        fs.renameSync(temporaryFile, CHATS_FILE);
+    } finally {
+        if (fs.existsSync(temporaryFile)) fs.unlinkSync(temporaryFile);
+    }
+}
+
+function cleanupOldRecords() {
+    try {
+        const now = Date.now();
+        const FOURTEEN_DAYS = 14 * 24 * 60 * 60 * 1000;
+        const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+
+        // Prune resolved community alerts older than 7 days, or inactive older than 14 days
+        const alerts = readCommunityAlerts();
+        const activeAlerts = alerts.filter(a => {
+            const age = now - new Date(a.createdAt).getTime();
+            if (a.resolved && a.resolvedAt) {
+                const resolvedAge = now - new Date(a.resolvedAt).getTime();
+                return resolvedAge < SEVEN_DAYS;
+            }
+            return age < FOURTEEN_DAYS;
+        });
+        if (activeAlerts.length !== alerts.length) {
+            writeCommunityAlerts(activeAlerts);
+        }
+
+        // Prune resolved chats older than 7 days, or inactive older than 14 days
+        const chats = readChats();
+        const activeChats = chats.filter(c => {
+            const lastActive = new Date(c.lastMessageAt || c.createdAt).getTime();
+            if (c.status === "resolved" && c.resolvedAt) {
+                const resolvedAge = now - new Date(c.resolvedAt).getTime();
+                return resolvedAge < SEVEN_DAYS;
+            }
+            return (now - lastActive) < FOURTEEN_DAYS;
+        });
+        if (activeChats.length !== chats.length) {
+            writeChats(activeChats);
+        }
+    } catch (e) {
+        console.error("Cleanup old records error:", e.message);
+    }
+}
+
 ensureDataFiles();
+cleanupOldRecords();
 
 // ================= FIREBASE ADMIN INIT =================
 let firebaseAdmin = null;
@@ -918,6 +987,447 @@ app.get("/api/notifications/stream", async (req,res)=>{
     sseClients.add(client);
     res.write(`data: ${JSON.stringify({type:"connected",message:"SSE connected with user isolation",uid:client.uid})}\n\n`);
     req.on("close",()=>{ sseClients.delete(client); });
+});
+
+// ================= COMMUNITY ALERTS (OPTION A) =================
+app.get("/api/community/alerts", (req, res) => {
+    try {
+        cleanupOldRecords();
+        const alerts = readCommunityAlerts().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        res.json({ success: true, count: alerts.length, data: alerts });
+    } catch (e) {
+        console.error("Error loading community alerts:", e.message);
+        res.status(500).json({ success: false, message: "Could not load community alerts." });
+    }
+});
+
+app.post("/api/community/alerts", optionalVerifyFirebaseToken, async (req, res) => {
+    try {
+        const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+        if (!checkRateLimit(ip)) return res.status(429).json({ success: false, message: "Too many posts. Please wait a minute." });
+
+        const content = (req.body.content || "").toString().trim();
+        const type = (req.body.type || "general_alert").toString().trim();
+        const location = (req.body.location || "Campus").toString().trim();
+        const imageUrl = (req.body.imageUrl || "").toString().trim();
+        const authorName = (req.body.authorName || "").toString().trim();
+
+        if (!content) return res.status(400).json({ success: false, message: "Content is required." });
+        if (content.length > 600) return res.status(400).json({ success: false, message: "Content is too long (max 600 chars)." });
+        if (location.length > 100) return res.status(400).json({ success: false, message: "Location is too long." });
+
+        if (imageUrl && !imageUrl.startsWith('https://res.cloudinary.com/v6m777sp/')) {
+            return res.status(400).json({ success: false, message: "Invalid image URL. Must start with https://res.cloudinary.com/v6m777sp/" });
+        }
+
+        const alerts = readCommunityAlerts();
+        const user = req.user;
+        const newAlert = {
+            id: Date.now() + Math.floor(Math.random() * 1000),
+            authorUid: user ? user.uid : null,
+            authorName: user ? (user.displayName || "Verified Student") : (authorName || "Student"),
+            authorVerified: user ? !!user.email_verified : false,
+            type: ["lost_alert", "found_alert", "urgent", "general_alert"].includes(type) ? type : "general_alert",
+            content,
+            location: location || "Campus",
+            imageUrl: imageUrl || "",
+            resolved: false,
+            resolvedAt: null,
+            createdAt: new Date().toISOString(),
+            replies: []
+        };
+
+        alerts.push(newAlert);
+        writeCommunityAlerts(alerts);
+
+        // Global broadcast notification to all students
+        createNotification({
+            type: "community_alert",
+            title: `📢 Campus Alert: ${newAlert.type === 'lost_alert' ? 'Lost Item Alert' : newAlert.type === 'found_alert' ? 'Found Item Alert' : newAlert.type === 'urgent' ? 'Urgent Campus Notice' : 'Campus Alert'}`,
+            message: `${newAlert.authorName} (${newAlert.location}): "${newAlert.content.slice(0, 100)}${newAlert.content.length > 100 ? '...' : ''}"`,
+            relatedReportId: newAlert.id,
+            ownerUid: null
+        });
+
+        res.status(201).json({ success: true, message: "Alert posted successfully.", data: newAlert });
+    } catch (e) {
+        console.error("Error creating community alert:", e.message);
+        res.status(500).json({ success: false, message: "Could not post alert." });
+    }
+});
+
+app.post("/api/community/alerts/:id/reply", optionalVerifyFirebaseToken, (req, res) => {
+    try {
+        const alertId = Number(req.params.id);
+        const content = (req.body.content || "").toString().trim();
+        const authorName = (req.body.authorName || "").toString().trim();
+
+        if (!content) return res.status(400).json({ success: false, message: "Reply content is required." });
+        if (content.length > 400) return res.status(400).json({ success: false, message: "Reply is too long (max 400 chars)." });
+
+        const alerts = readCommunityAlerts();
+        const alert = alerts.find(a => a.id === alertId);
+        if (!alert) return res.status(404).json({ success: false, message: "Alert not found." });
+
+        const user = req.user;
+        const newReply = {
+            id: Date.now() + Math.floor(Math.random() * 1000),
+            authorUid: user ? user.uid : null,
+            authorName: user ? (user.displayName || "Verified Student") : (authorName || "Student"),
+            authorVerified: user ? !!user.email_verified : false,
+            content,
+            createdAt: new Date().toISOString()
+        };
+
+        if (!Array.isArray(alert.replies)) alert.replies = [];
+        alert.replies.push(newReply);
+        writeCommunityAlerts(alerts);
+
+        if (alert.authorUid && (!user || user.uid !== alert.authorUid)) {
+            createNotification({
+                type: "community_reply",
+                title: "💬 New reply on your campus alert",
+                message: `${newReply.authorName}: "${newReply.content.slice(0, 80)}"`,
+                relatedReportId: alert.id,
+                ownerUid: alert.authorUid
+            });
+        }
+
+        res.json({ success: true, message: "Reply added.", data: newReply, alert });
+    } catch (e) {
+        console.error("Error adding reply:", e.message);
+        res.status(500).json({ success: false, message: "Could not add reply." });
+    }
+});
+
+app.post("/api/community/alerts/:id/resolve", verifyFirebaseToken, (req, res) => {
+    try {
+        const alertId = Number(req.params.id);
+        const alerts = readCommunityAlerts();
+        const alert = alerts.find(a => a.id === alertId);
+        if (!alert) return res.status(404).json({ success: false, message: "Alert not found." });
+
+        if (alert.authorUid && alert.authorUid !== req.user.uid) {
+            return res.status(403).json({ success: false, message: "Only the author can mark this alert resolved." });
+        }
+
+        alert.resolved = true;
+        alert.resolvedAt = new Date().toISOString();
+        writeCommunityAlerts(alerts);
+
+        res.json({ success: true, message: "Alert marked as resolved.", data: alert });
+    } catch (e) {
+        console.error("Error resolving alert:", e.message);
+        res.status(500).json({ success: false, message: "Could not resolve alert." });
+    }
+});
+
+app.delete("/api/community/alerts/:id", verifyFirebaseToken, (req, res) => {
+    try {
+        const alertId = Number(req.params.id);
+        let alerts = readCommunityAlerts();
+        const alert = alerts.find(a => a.id === alertId);
+        if (!alert) return res.status(404).json({ success: false, message: "Alert not found." });
+
+        if (alert.authorUid && alert.authorUid !== req.user.uid) {
+            return res.status(403).json({ success: false, message: "Only the author can delete this alert." });
+        }
+
+        alerts = alerts.filter(a => a.id !== alertId);
+        writeCommunityAlerts(alerts);
+
+        res.json({ success: true, message: "Alert deleted successfully." });
+    } catch (e) {
+        console.error("Error deleting alert:", e.message);
+        res.status(500).json({ success: false, message: "Could not delete alert." });
+    }
+});
+
+// ================= 1-ON-1 SECURE HANDOVER CHATS (OPTION B) =================
+app.get("/api/chats", verifyFirebaseToken, (req, res) => {
+    try {
+        cleanupOldRecords();
+        const uid = req.user.uid;
+        const chats = readChats();
+        const userChats = chats
+            .filter(c => Array.isArray(c.participants) && c.participants.some(p => p.uid === uid))
+            .sort((a, b) => new Date(b.lastMessageAt || b.createdAt) - new Date(a.lastMessageAt || a.createdAt))
+            .map(c => {
+                const other = c.participants.find(p => p.uid !== uid) || { displayName: "Student" };
+                const lastMsg = c.messages && c.messages.length > 0 ? c.messages[c.messages.length - 1] : null;
+                return {
+                    id: c.id,
+                    itemId: c.itemId,
+                    itemTitle: c.itemTitle,
+                    itemStatus: c.itemStatus,
+                    itemImage: c.itemImage || "",
+                    status: c.status,
+                    createdAt: c.createdAt,
+                    lastMessageAt: c.lastMessageAt,
+                    otherUser: {
+                        uid: other.uid,
+                        displayName: other.displayName || "Student"
+                    },
+                    lastMessage: lastMsg ? {
+                        text: lastMsg.text,
+                        senderUid: lastMsg.senderUid,
+                        createdAt: lastMsg.createdAt
+                    } : null,
+                    messageCount: c.messages ? c.messages.length : 0
+                };
+            });
+
+        res.json({ success: true, count: userChats.length, data: userChats });
+    } catch (e) {
+        console.error("Error loading chats:", e.message);
+        res.status(500).json({ success: false, message: "Could not load chats." });
+    }
+});
+
+app.get("/api/chats/:id", verifyFirebaseToken, (req, res) => {
+    try {
+        const chatId = req.params.id;
+        const uid = req.user.uid;
+        const chats = readChats();
+        const chat = chats.find(c => c.id === chatId);
+        if (!chat) return res.status(404).json({ success: false, message: "Chat not found." });
+
+        if (!Array.isArray(chat.participants) || !chat.participants.some(p => p.uid === uid)) {
+            return res.status(403).json({ success: false, message: "You are not authorized to view this private chat." });
+        }
+
+        res.json({ success: true, data: chat });
+    } catch (e) {
+        console.error("Error loading chat details:", e.message);
+        res.status(500).json({ success: false, message: "Could not load chat." });
+    }
+});
+
+app.post("/api/chats", verifyFirebaseToken, (req, res) => {
+    try {
+        const { itemId, itemTitle, itemStatus, itemImage, recipientUid, recipientName, initialMessage } = req.body;
+        const senderUid = req.user.uid;
+        const senderName = req.user.displayName || "Student";
+
+        if (!itemId) return res.status(400).json({ success: false, message: "itemId is required to start an item handover chat." });
+
+        if (recipientUid && recipientUid === senderUid) {
+            return res.status(400).json({ success: false, message: "Cannot start a chat with yourself." });
+        }
+
+        const chats = readChats();
+        const numItemId = Number(itemId);
+
+        // Check if chat already exists
+        let existing = chats.find(c =>
+            c.itemId === numItemId &&
+            c.participants.some(p => p.uid === senderUid) &&
+            (!recipientUid || c.participants.some(p => p.uid === recipientUid))
+        );
+
+        if (existing) {
+            if (initialMessage && String(initialMessage).trim()) {
+                const text = String(initialMessage).trim().slice(0, 1000);
+                const msg = {
+                    id: (existing.messages.length > 0 ? existing.messages[existing.messages.length - 1].id + 1 : 1),
+                    senderUid,
+                    senderName,
+                    text,
+                    createdAt: new Date().toISOString()
+                };
+                existing.messages.push(msg);
+                existing.lastMessageAt = msg.createdAt;
+                writeChats(chats);
+
+                const other = existing.participants.find(p => p.uid !== senderUid);
+                if (other && other.uid) {
+                    createNotification({
+                        type: "chat_message",
+                        title: `💬 ${senderName} (${existing.itemTitle})`,
+                        message: text.slice(0, 120),
+                        relatedReportId: existing.itemId,
+                        ownerUid: other.uid
+                    });
+                }
+            }
+            return res.json({ success: true, message: "Existing chat retrieved.", data: existing });
+        }
+
+        let finalTitle = itemTitle || "Campus Item";
+        let finalStatus = itemStatus || "found";
+        let finalImage = itemImage || "";
+        try {
+            const foundItem = readFoundItems().find(f => f.id === numItemId);
+            if (foundItem) {
+                finalTitle = foundItem.item || foundItem.title || finalTitle;
+                finalStatus = "found";
+                finalImage = foundItem.imageUrl || foundItem.photo || finalImage;
+            } else {
+                const lostItem = readLostItems().find(l => l.id === numItemId);
+                if (lostItem) {
+                    finalTitle = lostItem.item || lostItem.title || finalTitle;
+                    finalStatus = "lost";
+                    finalImage = lostItem.imageUrl || lostItem.photo || finalImage;
+                }
+            }
+        } catch {}
+
+        const newChat = {
+            id: `chat_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+            itemId: numItemId,
+            itemTitle: finalTitle,
+            itemStatus: finalStatus,
+            itemImage: finalImage,
+            participants: [
+                { uid: senderUid, displayName: senderName },
+                { uid: recipientUid || "campus_finder", displayName: recipientName || "Finder / Campus Community" }
+            ],
+            status: "active",
+            resolvedAt: null,
+            createdAt: new Date().toISOString(),
+            lastMessageAt: new Date().toISOString(),
+            messages: []
+        };
+
+        if (initialMessage && String(initialMessage).trim()) {
+            const text = String(initialMessage).trim().slice(0, 1000);
+            const msg = {
+                id: 1,
+                senderUid,
+                senderName,
+                text,
+                createdAt: new Date().toISOString()
+            };
+            newChat.messages.push(msg);
+
+            if (recipientUid) {
+                createNotification({
+                    type: "chat_message",
+                    title: `💬 New message about ${finalTitle}`,
+                    message: `${senderName}: "${text.slice(0, 100)}"`,
+                    relatedReportId: numItemId,
+                    ownerUid: recipientUid
+                });
+            }
+        }
+
+        chats.push(newChat);
+        writeChats(chats);
+
+        res.status(201).json({ success: true, message: "Handover chat started.", data: newChat });
+    } catch (e) {
+        console.error("Error starting chat:", e.message);
+        res.status(500).json({ success: false, message: "Could not create chat." });
+    }
+});
+
+app.post("/api/chats/:id/messages", verifyFirebaseToken, (req, res) => {
+    try {
+        const chatId = req.params.id;
+        const text = (req.body.text || "").toString().trim();
+        const senderUid = req.user.uid;
+        const senderName = req.user.displayName || "Student";
+
+        if (!text) return res.status(400).json({ success: false, message: "Message text is required." });
+        if (text.length > 1000) return res.status(400).json({ success: false, message: "Message too long (max 1000 chars)." });
+
+        const chats = readChats();
+        const chat = chats.find(c => c.id === chatId);
+        if (!chat) return res.status(404).json({ success: false, message: "Chat not found." });
+
+        if (!Array.isArray(chat.participants) || !chat.participants.some(p => p.uid === senderUid)) {
+            return res.status(403).json({ success: false, message: "You are not authorized to post in this chat." });
+        }
+
+        if (chat.status === "resolved") {
+            return res.status(400).json({ success: false, message: "This chat is marked as resolved. Re-open or start a new chat if needed." });
+        }
+
+        const newMsg = {
+            id: (chat.messages && chat.messages.length > 0 ? chat.messages[chat.messages.length - 1].id + 1 : 1),
+            senderUid,
+            senderName,
+            text,
+            createdAt: new Date().toISOString()
+        };
+
+        if (!Array.isArray(chat.messages)) chat.messages = [];
+        chat.messages.push(newMsg);
+        chat.lastMessageAt = newMsg.createdAt;
+        writeChats(chats);
+
+        const other = chat.participants.find(p => p.uid !== senderUid);
+        if (other && other.uid) {
+            createNotification({
+                type: "chat_message",
+                title: `💬 ${senderName} (${chat.itemTitle})`,
+                message: text.slice(0, 120),
+                relatedReportId: chat.itemId,
+                ownerUid: other.uid
+            });
+        }
+
+        res.status(201).json({ success: true, message: "Message sent.", data: newMsg, chat });
+    } catch (e) {
+        console.error("Error sending message:", e.message);
+        res.status(500).json({ success: false, message: "Could not send message." });
+    }
+});
+
+app.post("/api/chats/:id/resolve", verifyFirebaseToken, (req, res) => {
+    try {
+        const chatId = req.params.id;
+        const uid = req.user.uid;
+        const chats = readChats();
+        const chat = chats.find(c => c.id === chatId);
+        if (!chat) return res.status(404).json({ success: false, message: "Chat not found." });
+
+        if (!Array.isArray(chat.participants) || !chat.participants.some(p => p.uid === uid)) {
+            return res.status(403).json({ success: false, message: "Not authorized to resolve this chat." });
+        }
+
+        chat.status = "resolved";
+        chat.resolvedAt = new Date().toISOString();
+        writeChats(chats);
+
+        const other = chat.participants.find(p => p.uid !== uid);
+        if (other && other.uid) {
+            createNotification({
+                type: "general",
+                title: "🤝 Handover Resolved!",
+                message: `The item handover for "${chat.itemTitle}" was marked as completed. Thank you!`,
+                relatedReportId: chat.itemId,
+                ownerUid: other.uid
+            });
+        }
+
+        res.json({ success: true, message: "Chat marked as resolved.", data: chat });
+    } catch (e) {
+        console.error("Error resolving chat:", e.message);
+        res.status(500).json({ success: false, message: "Could not resolve chat." });
+    }
+});
+
+app.delete("/api/chats/:id", verifyFirebaseToken, (req, res) => {
+    try {
+        const chatId = req.params.id;
+        const uid = req.user.uid;
+        let chats = readChats();
+        const chat = chats.find(c => c.id === chatId);
+        if (!chat) return res.status(404).json({ success: false, message: "Chat not found." });
+
+        if (!Array.isArray(chat.participants) || !chat.participants.some(p => p.uid === uid)) {
+            return res.status(403).json({ success: false, message: "Not authorized to delete this chat." });
+        }
+
+        chats = chats.filter(c => c.id !== chatId);
+        writeChats(chats);
+
+        res.json({ success: true, message: "Chat deleted successfully." });
+    } catch (e) {
+        console.error("Error deleting chat:", e.message);
+        res.status(500).json({ success: false, message: "Could not delete chat." });
+    }
 });
 
 // GEMINI MATCHING LOGIC - PRESERVED

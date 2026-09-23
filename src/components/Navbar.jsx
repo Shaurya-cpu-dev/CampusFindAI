@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Search, Terminal, Bell } from 'lucide-react';
+import { Search, Terminal, Bell, MessageSquare, Radio } from 'lucide-react';
 import AuthModal from './AuthModal.jsx';
 import NotificationDropdown from './NotificationDropdown.jsx';
 import { useNotifications } from '../context/NotificationContext.jsx';
@@ -35,7 +35,29 @@ export default function Navbar({ user, onSearch, searchQuery = '' }) {
             />
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <NavLink
+              to="/community"
+              className={({ isActive }) =>
+                "hidden sm:flex px-3 py-2 rounded-xl text-xs font-bold items-center gap-1.5 transition-all " +
+                (isActive ? "bg-rose-50 text-primary" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50")
+              }
+            >
+              <Radio className="w-3.5 h-3.5 text-primary" />
+              <span>Campus Buzz</span>
+            </NavLink>
+
+            <NavLink
+              to="/chats"
+              className={({ isActive }) =>
+                "hidden sm:flex px-3 py-2 rounded-xl text-xs font-bold items-center gap-1.5 transition-all " +
+                (isActive ? "bg-gray-100 text-gray-900" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50")
+              }
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>Chats</span>
+            </NavLink>
+
             {/* Live Notification Bar / Bell Button with real-time badge */}
             <div className="relative">
               <button
@@ -59,7 +81,7 @@ export default function Navbar({ user, onSearch, searchQuery = '' }) {
             <NavLink
               to="/matches"
               className={({ isActive }) =>
-                "hidden sm:flex px-3.5 py-2 rounded-xl text-xs font-bold items-center gap-1.5 transition-all " +
+                "hidden sm:flex px-3 py-2 rounded-xl text-xs font-bold items-center gap-1.5 transition-all " +
                 (isActive ? "bg-gray-100 text-gray-900" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50")
               }
             >

@@ -1,10 +1,17 @@
 import React from 'react';
-import { X, MapPin, Calendar, ShieldCheck } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { X, MapPin, Calendar, ShieldCheck, MessageSquare } from 'lucide-react';
 
 export default function DetailModal({ item, onClose }) {
+  const navigate = useNavigate();
   if (!item) return null;
   const isFound = item.status === 'found';
   const imgUrl = item.imageUrl || item.photo;
+
+  function handleStartChat() {
+    onClose && onClose();
+    navigate(`/chats?itemId=${item.id}`);
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -71,10 +78,18 @@ export default function DetailModal({ item, onClose }) {
           </div>
         </div>
 
-        <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end">
+        <div className="p-4 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-2.5">
+          <button
+            onClick={handleStartChat}
+            className="w-full sm:w-auto px-5 py-2.5 bg-primary hover:bg-[#ff4349] text-white font-extrabold rounded-xl text-sm transition-all shadow-soft flex items-center justify-center gap-2"
+          >
+            <MessageSquare className="w-4 h-4" />
+            <span>Message / Coordinate Handover</span>
+          </button>
+
           <button
             onClick={onClose}
-            className="w-full sm:w-auto px-6 py-2.5 bg-gray-900 hover:bg-black text-white font-bold rounded-xl text-sm transition-all"
+            className="w-full sm:w-auto px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-xl text-sm transition-all"
           >
             Close
           </button>
